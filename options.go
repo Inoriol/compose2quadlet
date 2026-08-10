@@ -13,6 +13,32 @@ type transpileConfig struct {
 
 	// Network alias injection.
 	networkAliases bool
+
+	// Podman version to target. Zero value means "latest" (emit best-available mapping everywhere).
+	podmanVersion Version
+
+	// Warnings collected during the transpilation pipeline. Read after Transpile() returns.
+	Warnings []Warning
+}
+
+// Version holds a semantic version triple. Zero value means "latest / unspecified".
+type Version struct {
+	Major, Minor, Patch int
+}
+
+// AtLeast returns true if v is at least the given major.minor.
+// Zero Version always returns true (latest implies everything is available).
+func (v Version) AtLeast(major, minor int) bool {
+	if v.Major == 0 && v.Minor == 0 {
+		return true
+	}
+	if v.Major > major {
+		return true
+	}
+	if v.Major == major && v.Minor >= minor {
+		return true
+	}
+	return false
 }
 
 func defaultConfig() *transpileConfig {
@@ -79,4 +105,20 @@ func WithoutInstallSection() TranspileOption {
 // WithoutNetworkAliases disables automatic NetworkAlias=<service> injection.
 func WithoutNetworkAliases() TranspileOption {
 	return func(c *transpileConfig) { c.networkAliases = false }
+}
+
+// WithPodmanVersion sets the target podman version. Mappers use this to decide
+// between P1 native directives and P3 PodmanArgs fallbacks. Fields that are
+// structurally impossible at the given version (e.g. build on < 5.2.0) produce
+// a fatal warning and Transpile() returns an error.
+//
+// Pass a zero Version or omit the option to target the latest podman release.
+func WithPodmanVersion(v Version) TranspileOption {
+	return func(c *transpileConfig) { c.podmanVersion = v }
+}
+
+// warn appends a warning to the config. Used internally by mappers to surface
+// skipped, degraded, and fatal mapping outcomes.
+func (c *transpileConfig) warn(w Warning) {
+	c.Warnings = append(c.Warnings, w)
 }

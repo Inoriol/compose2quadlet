@@ -4,6 +4,8 @@ Go library that transpiles Docker Compose files into Podman Quadlet unit files.
 
 **Not a CLI tool.** This is a library designed to be consumed by [comquad](https://github.com/inoriol/comquad) and other tools that need programmatic compose-to-quadlet conversion.
 
+Heavily inspired by [podlet](https://github.com/containers/podlet), but designed for the Go ecosystem with structured output types instead of fragile text manipulation.
+
 ## Motivation
 
 Replaces the `podlet` binary dependency with a native Go library. Eliminates the fragile text-based pipeline (preprocess → strip → transpile → cook → graft) with structured, type-safe quadlet output.
@@ -41,4 +43,4 @@ func main() {
 
 ## License
 
-Apache-2.0
+MIT

@@ -45,13 +45,14 @@ compose2quadlet/
 ├── README.md                 # End-user documentation
 ├── go.mod                    # module github.com/inoriol/compose2quadlet
 │
-├── types.go                  # Core types: QuadletUnit, Section, Directive, UnitType
-├── transpile.go              # Entry point: Transpile(project, opts...) → []QuadletUnit
-├── options.go                # transpileConfig, TranspileOption functions
+├── types.go                  # Core types: QuadletUnit, Section, Directive, UnitType, Warning, WarningLevel
+├── transpile.go              # Entry point: Transpile(project, opts...) → ([]QuadletUnit, error)
+├── options.go                # transpileConfig, TranspileOption, Version, version checks
 │
 ├── mapper/                   # Field mapping logic (to be implemented)
-│   ├── container.go          # service → [Container] directives (priority 1)
-│   ├── service.go            # deploy/restart/resource → [Service] directives (priority 2)
+│   ├── mapper.go             # Central version-gated field registry + resolve logic
+│   ├── container.go          # service → [Container] directives (P1)
+│   ├── service.go            # deploy/restart/resource → [Service] directives (P2)
 │   ├── unit.go               # depends_on → [Unit] After=/Requires=/Wants=/BindsTo=
 │   ├── network.go            # service networks → [Container] Network= + .network quadlet
 │   ├── volume.go             # service volumes → [Container] Volume=/Mount= + .volume quadlet
@@ -195,6 +196,46 @@ Every compose field maps to exactly one of four levels. This is documented exhau
 
 Priority 2 fields go in the `[Service]` section of the container unit. Quadlet passes `[Service]` directives through to the generated `.service` file, so systemd enforces them at the cgroup level. This is superior to using `PodmanArgs` because systemd can enforce limits even if podman is bypassed.
 
+## Version Awareness
+
+The library tracks a target podman version (via `WithPodmanVersion()` or defaults to "latest"). Mappers gate output based on this version:
+
+| Target version | `entrypoint:` behavior | `build:` behavior |
+|---|---|---|
+| Zero / latest | Emit `Entrypoint=` (P1) | Emit `.build` unit (P1) |
+| `5.0.0` | Emit `Entrypoint=` (P1, since 5.0) | Emit `.build` unit (P1, since 5.2) |
+| `4.8.0` | Emit `PodmanArgs=--entrypoint ...` (P3 fallback) | **Fatal error** — impossible |
+
+The version check is centralized:
+
+- **`mapper/mapper.go`** — A central version-gated field registry handles simple 1:1 fields where the P1 key is available from a minimum version and the P3 `PodmanArgs` fallback is mechanical. ~85% of version-gated fields live here.
+- **Custom mapper functions** — Complex fields (e.g. `build` which produces a whole unit, `entrypoint` which has a non-trivial P3 format) use `cfg.podmanVersion.AtLeast(...)` directly in their code.
+
+Systemd versions are tracked only as documentation in `doc/mapping.md`. In practice, modern podman implies modern systemd, so the library collapses to a single podman version axis.
+
+## Warning System
+
+Every field that cannot be mapped is surfaced — there are **no silent skips**. Three severity levels:
+
+| Level | Meaning | Example | Consumer impact |
+|---|---|---|---|
+| `WarningSkipped` | Feature unavailable at target podman version | `network_aliases` on podman 4.8.0 | Info: "field skipped, requires podman 5.2.0" |
+| `WarningDegraded` | P3 PodmanArgs fallback instead of P1 | `entrypoint` on podman 4.8.0 | Warn: "mapped via PodmanArgs, upgrade to podman 5.0 for native support" |
+| `WarningFatal` | Mapping is impossible at this version | `build:` on podman 4.8.0 | `Transpile()` returns error |
+
+Warnings are collected in `transpileConfig.Warnings` during the pipeline and surfaced alongside the result. Consumers (comquad) decide how to present each level. No separate error/warning channel is threaded through mapper signatures — the config acts as a shared collector.
+
+```go
+// Internal usage in a mapper:
+cfg.warn(Warning{
+    Level:   WarningDegraded,
+    Service:  svc.Name,
+    Field:    "entrypoint",
+    Message:  "using PodmanArgs fallback",
+    Since:    "5.0.0",
+})
+```
+
 ## Opinionated Defaults
 
 All transforms are **enabled by default** and can be individually disabled via `TranspileOption`. This matches comquad's current behavior.
@@ -251,14 +292,61 @@ Directives within a section should follow the order from the quadlet spec where 
 
 ## Testing Strategy
 
-### Unit Tests
-Each mapper function is tested independently with table-driven tests. Input: a `types.ServiceConfig` (or subset). Output: expected `[]Directive`.
+### Tier 0 — Serialization (`serde/ini.go`)
+QuadletUnit → ini text correctness:
 
-### Compatibility Parity
-The podlet compatibility matrix (`podlet-v0.3.2-podman-v5.8.json`, 987 test entries) serves as a baseline. For every field where podlet achieves `level 2` (Supported), the library must achieve at least the same level.
+- Section ordering (`[Unit]` → `[Container]` → `[Service]` → `[Install]`)
+- Multi-value directive rendering (multiple `Volume=`, `Environment=` lines)
+- Empty-value directives (boolean flags: `NoNewPrivileges=`)
+- **Empty-default**: each unit type with only mandatory fields renders correctly (no trailing empty lines, no missing `\n`)
+- **Empty section omission**: sections with zero directives are not rendered (no dangling `[Unit]\n` header)
+- **Round-trip**: serialize → deserialize → identical `QuadletUnit`, for every unit type
+- **Comment line**: `# FileName=<name>` header line present/absent in output
 
-### Integration Tests
-Deferred to comquad's existing `tests/integration/` harness. The library itself doesn't start podman or systemd.
+### Tier 1 — Mapper Unit Tests (`mapper/*_test.go`)
+Each mapper function tested independently with table-driven tests.
+Input: compose-go `types.ServiceConfig` (or relevant field subset).
+Output: expected `[]Directive` (or `[]QuadletUnit` for structural mappers).
+
+Tests focus on **correct output at latest podman version**. Version-gated behavior is tested in Tier 2.
+
+### Tier 2 — Version Matrix (`version_test.go` in package root)
+A dedicated test file that runs the same compose input through multiple target podman versions and asserts correct behavior per version boundary (4.8.0, 5.0.0, 5.2.0, 5.3.0, 5.5.0, 5.8.0, 6.0.0, 6.1.0). Covers:
+
+- Fields that promote from P3 PodmanArgs to P1 native directive (`entrypoint`, `stop_signal`, `extra_hosts`)
+- Fields that become available at a boundary (`notify`, `network_aliases`, `addhost`, `log_options`)
+- Fields that switch section (`mem_limit`: `[Service] MemoryMax=` → `[Container] Memory=`)
+- Structural blocks that cause fatal errors (`build` on < 5.2.0)
+- Correct `Warning` collection at each severity level
+
+### Tier 3 — Pipeline Integration (`transpile_test.go`)
+Full compose YAML → compose-go parse → `Transpile()` → verify `[]QuadletUnit` structure:
+- Single service, multi-service, no-service (top-level networks/volumes only)
+- Option combinatorics: pairs of enable/disable on opinionated transforms
+- Warning collection verification
+- Edge cases: empty service, build-only service, host network mode, external volumes/networks
+
+```go
+func TestTranspile_SimpleWeb(t *testing.T) {
+    project := loadFixture(t, "testdata/simple-web.yaml")
+    units, err := Transpile(project, WithProjectName("test"))
+    require.NoError(t, err)
+    require.Len(t, units, 2) // web.container + web.image
+    assertSectionKey(t, units[0], SectionContainer, "PublishPort")
+}
+```
+
+### Tier 4 — End-to-End (deferred to comquad)
+comquad's existing `tests/integration/` harness. The library itself does not start podman or systemd.
+
+### Test Conventions
+- Fixture compose files live in `testdata/` at the package root.
+- Table-driven tests use `t.Run()` for each entry with descriptive names.
+- Golden files for serde live in `testdata/serde/` with `.golden` extension.
+- Test helper functions (`assertSectionKey`, `loadFixture`) are shared in a `helpers_test.go` file.
+- No external test dependencies beyond the standard library and compose-go/v2.
+- **Empty-default pattern**: every unit type gets a test verifying that a `QuadletUnit` with only mandatory fields serializes correctly — catches section rendering bugs early.
+- **Round-trip pattern**: for serde, every test verifying serialization should also verify deserialization produces the same struct.
 
 ## Development Order (Milestones)
 

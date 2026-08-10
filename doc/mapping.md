@@ -20,7 +20,7 @@ The **Since** column tracks the minimum version required for each mapping:
 | Format | Meaning |
 |---|---|
 | `4.4.0` | Minimum podman version for this quadlet directive |
-| `sd 213` | Minimum systemd version for this `[Service]` directive |
+| `sd 213` | Minimum systemd version for this `[Service]` directive — **reference only** (not used in code; modern podman implies modern systemd) |
 | `—` | Not applicable (structural, unsupported, or no specific version constraint) |
 | `?` | Version uncertain, needs verification |
 
@@ -46,6 +46,9 @@ The **Since** column tracks the minimum version required for each mapping:
 | **3** | PodmanArgs passthrough — no first-class Quadlet directive |
 | **4** | Unsupported — orchestration / Swarm / Windows / Docker Desktop concept |
 | — | Structural — handled by generating a separate quadlet unit |
+
+### Mapping Principle
+**No silent skips.** Every compose field that cannot be mapped at the target podman version must produce a `Warning`. Severity depends on whether the field is skipped (info), degraded to PodmanArgs (warning), or structurally impossible (fatal error).
 
 ---
 

@@ -1,5 +1,23 @@
 package compose2quadlet
 
+// WarningLevel classifies how a field mapping issue is surfaced to the consumer.
+type WarningLevel int
+
+const (
+	WarningSkipped  WarningLevel = iota // feature unavailable at target podman version, skipped with info
+	WarningDegraded                     // P3 PodmanArgs fallback used instead of P1 native directive
+	WarningFatal                        // cannot proceed (mapping is impossible at this podman version)
+)
+
+// Warning describes a single mapping concern for a specific compose field and service.
+type Warning struct {
+	Level    WarningLevel
+	Service  string // service name, empty if not service-scoped
+	Field    string // compose field name (e.g. "build", "entrypoint")
+	Message  string // human-readable description
+	Since    string // minimum podman version required, if applicable (e.g. "5.2.0")
+}
+
 // UnitType represents the kind of quadlet unit file.
 type UnitType string
 
