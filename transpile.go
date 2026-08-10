@@ -1,16 +1,52 @@
 package compose2quadlet
 
-import "github.com/compose-spec/compose-go/v2/types"
+import (
+	"errors"
 
-// Transpile converts a parsed compose project into quadlet units.
-// All opinionated transforms are applied by default; disable them via options.
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/inoriol/compose2quadlet/mapper"
+)
+
 func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, error) {
 	cfg := defaultConfig()
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	// TODO: implement field mapping pipeline
-	_ = project
-	_ = cfg
-	return nil, nil
+
+	var units []QuadletUnit
+
+	for name, svc := range project.Services {
+		var sections []Section
+
+		unitDirs := mapper.Unit(svc)
+		if len(unitDirs) > 0 {
+			sections = append(sections, Section{Name: SectionUnit, Directives: unitDirs})
+		}
+
+		containerDirs := mapper.Container(svc, cfg)
+		hcDirs := mapper.Healthcheck(svc, cfg)
+		containerDirs = append(containerDirs, hcDirs...)
+
+		if len(containerDirs) > 0 {
+			sections = append(sections, Section{Name: SectionContainer, Directives: containerDirs})
+		}
+
+		if len(sections) == 0 {
+			continue
+		}
+
+		units = append(units, QuadletUnit{
+			Type:     UnitContainer,
+			Name:     name,
+			Sections: sections,
+		})
+	}
+
+	for _, w := range cfg.Warnings {
+		if w.Level == WarningFatal {
+			return nil, errors.New(w.Message)
+		}
+	}
+
+	return units, nil
 }

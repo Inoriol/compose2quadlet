@@ -45,35 +45,39 @@ compose2quadlet/
 ├── README.md                 # End-user documentation
 ├── go.mod                    # module github.com/inoriol/compose2quadlet
 │
-├── types.go                  # Core types: QuadletUnit, Section, Directive, UnitType, Warning, WarningLevel
+├── types.go                  # Type aliases re-exporting from internal/types/
 ├── transpile.go              # Entry point: Transpile(project, opts...) → ([]QuadletUnit, error)
-├── options.go                # transpileConfig, TranspileOption, Version, version checks
+├── options.go                # TranspileOption constructors, delegates to internal/types/
 │
-├── mapper/                   # Field mapping logic (to be implemented)
-│   ├── mapper.go             # Central version-gated field registry + resolve logic
-│   ├── container.go          # service → [Container] directives (P1)
-│   ├── service.go            # deploy/restart/resource → [Service] directives (P2)
-│   ├── unit.go               # depends_on → [Unit] After=/Requires=/Wants=/BindsTo=
-│   ├── network.go            # service networks → [Container] Network= + .network quadlet
-│   ├── volume.go             # service volumes → [Container] Volume=/Mount= + .volume quadlet
-│   ├── image.go              # image/platform → .image quadlet
-│   ├── build.go              # build blocks → .build quadlet
-│   └── secrets.go            # secrets/configs → Volume= / Secret= (pre-mapping intercept)
+├── internal/
+│   └── types/                # Shared types — no import cycles
+│       ├── core.go           # QuadletUnit, Section, Directive, Warning, WarningLevel, UnitType, section constants
+│       └── config.go         # Config, Version, Option, DefaultConfig(), Warn()
+│
+├── mapper/                   # Field mapping logic (implemented)
+│   ├── container.go          # Container(), t0Container(), t1Container() — P1 [Container] directives
+│   ├── unit.go               # Unit() — depends_on → [Unit] After=/Requires=/Wants=/BindsTo=
+│   ├── healthcheck.go        # Healthcheck() — healthcheck directives
+│   ├── security.go           # SecurityOpts() — security_opt parsing
+│   └── ports.go              # formatPort() helper
 │
 ├── opinionated/              # Opinionated transforms (to be implemented)
-│   ├── prefix.go             # cq-<project>- file prefixing
-│   ├── references.go         # Cross-unit reference rewriting
-│   ├── aliases.go            # NetworkAlias=<service> per network
-│   ├── selinux.go            # :z on volume mounts
-│   ├── labels.go             # com.comquad.managed / com.comquad.project labels
-│   ├── network.go            # Default network injection (cq-default.network)
-│   ├── ports.go              # Rootless port offsetting
-│   └── install.go            # [Install] WantedBy=default.target
 │
-├── serde/                    # Serialization / deserialization (to be implemented)
-│   └── ini.go                # QuadletUnit → .container/.volume/.network file text
+├── serialization/            # Serialization / deserialization (implemented)
+│   └── ini.go                # Marshal(), Write(), Unmarshal()
 │
 ├── doc/
+│   └── mapping.md            # Complete field-by-field mapping reference
+│
+└── (reference files)
+    ├── podman-systemd.unit.5.md # Full quadlet spec
+    ├── systemd.unit
+    ├── systemd.service
+    ├── systemd.resource-control
+    ├── systemd.scope
+    ├── systemd.slice
+    └── deploy.md
+```
 │   └── mapping.md            # Complete field-by-field mapping reference
 │
 └── (reference files)
@@ -152,9 +156,10 @@ Transpile(project, opts...)
     │
     ├── 3. Field mapping phase (mapper/)
     │       For each service:
-    │       ├── container.go: service fields → [Container] directives (P1)
+    │       ├── container.go: service fields → [Container] directives (P1) ✅
+    │       ├── unit.go: depends_on → [Unit] After=/Requires= ✅
+    │       ├── healthcheck.go: healthcheck → HealthCmd= etc. ✅
     │       ├── service.go:  deploy/resources → [Service] directives (P2)
-    │       ├── unit.go:     depends_on → [Unit] After=/Requires= (P1/P2)
     │       ├── network.go:  networks → Network= + .network quadlet
     │       ├── volume.go:   volumes  → Volume= + .volume quadlet
     │       ├── image.go:    image    → .image quadlet
@@ -176,7 +181,7 @@ Transpile(project, opts...)
 []QuadletUnit   ← structured, typed output
     │
     ▼
-serde/ini.go    ← serialize to ini text format (optional; comquad may serialize itself)
+serialization/ini.go    ← serialize to ini text format (optional; comquad may serialize itself)
     │
     ▼
 foo.container, bar.network, baz.volume files written to disk
@@ -292,7 +297,7 @@ Directives within a section should follow the order from the quadlet spec where 
 
 ## Testing Strategy
 
-### Tier 0 — Serialization (`serde/ini.go`)
+### Tier 0 — Serialization (`serialization/ini.go`)
 QuadletUnit → ini text correctness:
 
 - Section ordering (`[Unit]` → `[Container]` → `[Service]` → `[Install]`)
@@ -342,17 +347,17 @@ comquad's existing `tests/integration/` harness. The library itself does not sta
 ### Test Conventions
 - Fixture compose files live in `testdata/` at the package root.
 - Table-driven tests use `t.Run()` for each entry with descriptive names.
-- Golden files for serde live in `testdata/serde/` with `.golden` extension.
+- Golden files for serialization live in `testdata/serialization/` with `.golden` extension.
 - Test helper functions (`assertSectionKey`, `loadFixture`) are shared in a `helpers_test.go` file.
 - No external test dependencies beyond the standard library and compose-go/v2.
 - **Empty-default pattern**: every unit type gets a test verifying that a `QuadletUnit` with only mandatory fields serializes correctly — catches section rendering bugs early.
-- **Round-trip pattern**: for serde, every test verifying serialization should also verify deserialization produces the same struct.
+- **Round-trip pattern**: for serialization, every test verifying serialization should also verify deserialization produces the same struct.
 
 ## Development Order (Milestones)
 
 From the project scope document:
 
-1. **MVP** — `.container` files only, priority-1 field mappings, no opinionated transforms
+1. **MVP** — `.container` files only, priority-1 field mappings, no opinionated transforms ✅
 2. **Full compose parity** — `.network`, `.volume`, `.image`, `.build` support, all priority-1 + priority-2
 3. **Opinionated defaults** — all comquad transforms ported as opt-out `TranspileOption`s
 4. **Deploy + systemd** — `deploy.resources`, `deploy.restart_policy` mapped to `[Service]`
