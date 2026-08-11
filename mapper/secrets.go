@@ -2,6 +2,7 @@ package mapper
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	c2qtypes "github.com/inoriol/compose2quadlet/internal/types"
@@ -109,7 +110,7 @@ func processConfig(serviceName string, ref types.ServiceConfigObjConfig, def typ
 		mount += ",gid=" + ref.GID
 	}
 	if ref.Mode != nil {
-		mount += ",mode=" + ref.Mode.String()
+		mount += fmt.Sprintf(",mode=%04o", os.FileMode(*ref.Mode))
 	}
 
 	return []c2qtypes.Directive{{Key: "Mount", Values: []string{mount}}}

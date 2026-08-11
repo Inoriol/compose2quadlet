@@ -10,7 +10,7 @@ import (
 func Volumes(volumes types.Volumes, cfg *c2qtypes.Config) []c2qtypes.QuadletUnit {
 	var units []c2qtypes.QuadletUnit
 	for name, vc := range volumes {
-		if bool(vc.External) {
+		if vc.External {
 			continue
 		}
 		var dirs []c2qtypes.Directive
@@ -29,8 +29,8 @@ func Volumes(volumes types.Volumes, cfg *c2qtypes.Config) []c2qtypes.QuadletUnit
 		}
 		if len(vc.DriverOpts) > 0 {
 			if cfg.PodmanVersion.AtLeast(6, 0) {
-				for k, v := range vc.DriverOpts {
-					dirs = append(dirs, c2qtypes.Directive{Key: "Options", Values: []string{k + "=" + v}})
+				for _, k := range sortedKeys(vc.DriverOpts) {
+					dirs = append(dirs, c2qtypes.Directive{Key: "Options", Values: []string{k + "=" + vc.DriverOpts[k]}})
 				}
 			} else {
 				cfg.Warn(c2qtypes.Warning{
@@ -55,8 +55,8 @@ func Volumes(volumes types.Volumes, cfg *c2qtypes.Config) []c2qtypes.QuadletUnit
 				})
 			}
 		}
-		for k, v := range vc.Labels {
-			dirs = append(dirs, c2qtypes.Directive{Key: "Label", Values: []string{fmt.Sprintf("%s=%s", k, v)}})
+		for _, k := range sortedKeys(vc.Labels) {
+			dirs = append(dirs, c2qtypes.Directive{Key: "Label", Values: []string{fmt.Sprintf("%s=%s", k, vc.Labels[k])}})
 		}
 
 		units = append(units, c2qtypes.QuadletUnit{

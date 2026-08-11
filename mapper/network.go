@@ -10,7 +10,7 @@ import (
 func Networks(networks types.Networks, cfg *c2qtypes.Config) []c2qtypes.QuadletUnit {
 	var units []c2qtypes.QuadletUnit
 	for name, nc := range networks {
-		if bool(nc.External) {
+		if nc.External {
 			continue
 		}
 		var dirs []c2qtypes.Directive
@@ -19,8 +19,8 @@ func Networks(networks types.Networks, cfg *c2qtypes.Config) []c2qtypes.QuadletU
 		}
 		if len(nc.DriverOpts) > 0 {
 			if cfg.PodmanVersion.AtLeast(6, 0) {
-				for k, v := range nc.DriverOpts {
-					dirs = append(dirs, c2qtypes.Directive{Key: "Options", Values: []string{k + "=" + v}})
+				for _, k := range sortedKeys(nc.DriverOpts) {
+					dirs = append(dirs, c2qtypes.Directive{Key: "Options", Values: []string{k + "=" + nc.DriverOpts[k]}})
 				}
 			} else {
 				cfg.Warn(c2qtypes.Warning{
@@ -71,9 +71,9 @@ func Networks(networks types.Networks, cfg *c2qtypes.Config) []c2qtypes.QuadletU
 				break
 			}
 		}
-		for k, v := range nc.Labels {
+		for _, k := range sortedKeys(nc.Labels) {
 			if cfg.PodmanVersion.AtLeast(5, 6) {
-				dirs = append(dirs, c2qtypes.Directive{Key: "Label", Values: []string{fmt.Sprintf("%s=%s", k, v)}})
+				dirs = append(dirs, c2qtypes.Directive{Key: "Label", Values: []string{fmt.Sprintf("%s=%s", k, nc.Labels[k])}})
 			} else {
 				cfg.Warn(c2qtypes.Warning{
 					Level:   c2qtypes.WarningSkipped,

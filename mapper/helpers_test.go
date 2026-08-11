@@ -26,6 +26,15 @@ func assertDirective(t *testing.T, dirs []c2qtypes.Directive, key, value string)
 	t.Fatalf("directive %s=%s not found in %v", key, value, dirs)
 }
 
+func assertNoDirective(t *testing.T, dirs []c2qtypes.Directive, key string) {
+	t.Helper()
+	for _, d := range dirs {
+		if d.Key == key {
+			t.Fatalf("unexpected directive %s found in %v", key, dirs)
+		}
+	}
+}
+
 func hasDirective(dirs []c2qtypes.Directive, key, value string) bool {
 	for _, d := range dirs {
 		if d.Key != key {

@@ -24,7 +24,7 @@ func ApplySELinux(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qtypes
 
 				if d.Key == "Volume" || d.Key == "Mount" {
 					for vi := range d.Values {
-						if strings.Contains(d.Values[vi], ":z") || strings.Contains(d.Values[vi], ":Z") {
+						if hasSELinuxContext(d.Values[vi]) {
 							continue
 						}
 						if d.Key == "Mount" {
@@ -39,4 +39,13 @@ func ApplySELinux(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qtypes
 	}
 
 	return units
+}
+
+func hasSELinuxContext(v string) bool {
+	lastColon := strings.LastIndex(v, ":")
+	if lastColon == -1 {
+		return false
+	}
+	rest := v[lastColon+1:]
+	return rest == "z" || rest == "Z" || strings.HasPrefix(rest, "z,") || strings.HasPrefix(rest, "Z,")
 }

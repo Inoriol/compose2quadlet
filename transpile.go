@@ -68,13 +68,13 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 	volUnits := mapper.Volumes(project.Volumes, cfg)
 	units = append(units, volUnits...)
 
-	units = opinionated.Apply(units, cfg)
-
 	for _, w := range cfg.Warnings {
 		if w.Level == WarningFatal {
 			return nil, errors.New(w.Message)
 		}
 	}
+
+	units = opinionated.Apply(units, cfg)
 
 	return units, nil
 }

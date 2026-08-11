@@ -50,6 +50,25 @@ compose2quadlet/
 ├── types.go                  # Type aliases re-exporting from internal/types/
 ├── transpile.go              # Entry point: Transpile(project, opts...) → ([]QuadletUnit, error)
 ├── options.go                # TranspileOption constructors, delegates to internal/types/
+├── helpers_test.go           # Shared test helpers for root-level tests
+├── version_test.go           # Tier 2 — version matrix tests
+├── transpile_test.go         # Tier 3 — pipeline integration tests
+│
+├── testdata/                 # Test fixtures
+│   ├── simple-web.yaml
+│   ├── multi-service.yaml
+│   ├── edge-cases.yaml
+│   ├── top-level.yaml
+│   ├── version-basic.yaml
+│   ├── version-build.yaml
+│   ├── version-features.yaml
+│   ├── version-memory.yaml
+│   └── serialization/        # Tier 0 — golden files
+│       ├── container.golden
+│       ├── network.golden
+│       ├── volume.golden
+│       ├── image.golden
+│       └── build.golden
 │
 ├── internal/
 │   └── types/                # Shared types — no import cycles
@@ -67,7 +86,8 @@ compose2quadlet/
 │   ├── build.go              # Builds() — .build quadlets (fatal error pre-5.2.0)
 │   ├── network.go            # Networks() — top-level .network quadlets
 │   ├── volume.go             # Volumes() — top-level .volume quadlets
-│   └── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor
+│   ├── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor
+│   └── helpers.go            # sortedKeys() — deterministic map key ordering
 │
 ├── opinionated/              # Opinionated transforms
 │   ├── opinionated.go        # Apply() — orchestrates all transforms
@@ -200,6 +220,8 @@ Every compose field maps to exactly one of four levels. This is documented exhau
 
 Priority 2 fields go in the `[Service]` section of the container unit. Quadlet passes `[Service]` directives through to the generated `.service` file, so systemd enforces them at the cgroup level. This is superior to using `PodmanArgs` because systemd can enforce limits even if podman is bypassed.
 
+Where both P1 and P2 directives exist for the same field (e.g. `ulimits` → `Ulimit=` P1 vs `LimitXXX=` P2), only P2 is emitted. The systemd enforcement path is always preferred over the equivalent quadlet directive.
+
 ## Version Awareness
 
 The library tracks a target podman version (via `WithPodmanVersion()` or defaults to "latest"). Mappers gate output based on this version:
@@ -255,6 +277,7 @@ All transforms are **enabled by default** and can be individually disabled via `
 | Port offset | `WithPortOffset(N)` | Adds offset to all host-side published ports |
 | AutoUpdate | `WithAutoUpdate()` | Adds `AutoUpdate=registry` to containers |
 | Install section | `WithoutInstallSection()` | Adds `[Install] WantedBy=default.target` |
+| Image retry | `WithImageRetry(N)` / `WithImageRetryDelay(S)` | Sets `Retry=`/`RetryDelay=` on `.image` units (default: 3 / 5s) |
 
 ## Quadlet-Specific Behaviors
 
@@ -293,6 +316,9 @@ The mapper must output these `.network`/`.volume`/`.image`/`.build` suffixes so 
 ### Directive Ordering
 Directives within a section should follow the order from the quadlet spec where possible. Systemd `[Service]` directives go after all `[Container]` directives. `[Unit]` goes before `[Container]`, `[Install]` goes last.
 
+### Deterministic Map Iteration
+All map iteration (labels, annotations, environment, sysctls, logging options, extra hosts, ulimits, build args, driver opts, storage opts) must use the `sortedKeys()` helper from `mapper/helpers.go`. This ensures reproducible directive ordering and stable golden file tests.
+
 ## Testing Strategy
 
 ### Tier 0 — Serialization (`serialization/ini.go`)
@@ -313,29 +339,38 @@ Output: expected `[]Directive` (or `[]QuadletUnit` for structural mappers).
 
 Tests focus on **correct output at latest podman version**. Version-gated behavior is tested in Tier 2.
 
-### Tier 2 — Version Matrix (planned)
-A dedicated test file that runs the same compose input through multiple target podman versions and asserts correct behavior per version boundary (4.8.0, 5.0.0, 5.2.0, 5.3.0, 5.5.0, 5.8.0, 6.0.0, 6.1.0). Covers:
+### Opinionated Transform Tests (`opinionated/*_test.go`)
+Each transform tested independently with input `[]QuadletUnit` slices and config, verifying correct mutations to unit names, directives, and sections. Covers all transforms: prefix, references, aliases, SELinux, labels, default network, port offset, auto-update, install section, and the full `Apply()` pipeline.
+
+### Tier 2 — Version Matrix
+A dedicated test file (`version_test.go`) that runs the same compose input through multiple target podman versions and asserts correct behavior per version boundary (4.8.0, 5.0.0, 5.2.0, 5.3.0, 5.5.0). Covers:
 
 - Fields that promote from P3 PodmanArgs to P1 native directive (`entrypoint`, `stop_signal`, `extra_hosts`)
-- Fields that become available at a boundary (`notify`, `network_aliases`, `addhost`, `log_options`)
+- Fields that become available at a boundary (`network_aliases`, `addhost`, `log_options`)
 - Fields that switch section (`mem_limit`: `[Service] MemoryMax=` → `[Container] Memory=`)
 - Structural blocks that cause fatal errors (`build` on < 5.2.0)
 - Correct `Warning` collection at each severity level
 
-### Tier 3 — Pipeline Integration (planned)
-Full compose YAML → compose-go parse → `Transpile()` → verify `[]QuadletUnit` structure:
+### Tier 3 — Pipeline Integration
+Full compose YAML → compose-go parse → `Transpile()` → verify `[]QuadletUnit` structure (`transpile_test.go`, `testdata/` fixtures):
 - Single service, multi-service, no-service (top-level networks/volumes only)
 - Option combinatorics: pairs of enable/disable on opinionated transforms
 - Warning collection verification
-- Edge cases: empty service, build-only service, host network mode, external volumes/networks
+- Edge cases: build-only service, external volumes/networks
 
 ```go
 func TestTranspile_SimpleWeb(t *testing.T) {
-    project := loadFixture(t, "testdata/simple-web.yaml")
-    units, err := Transpile(project, WithProjectName("test"))
-    require.NoError(t, err)
-    require.Len(t, units, 2) // web.container + web.image
-    assertSectionKey(t, units[0], SectionContainer, "PublishPort")
+    project := loadProject(t, "testdata/simple-web.yaml")
+    units, err := Transpile(project, WithProjectName("test"),
+        WithoutPrefix(), WithoutDefaultNetwork(), WithoutSELinux(),
+        WithoutNetworkAliases(), WithoutInstallSection(),
+    )
+    if err != nil { t.Fatal(err) }
+    unit, ok := findUnit(units, "test-web", UnitContainer)
+    if !ok { t.Fatal("expected test-web.container unit") }
+    sec, ok := hasSection(unit, SectionContainer)
+    if !ok { t.Fatal("expected [Container] section") }
+    assertDirectiveValue(t, sec.Directives, "PublishPort", "8080:80")
 }
 ```
 
@@ -343,10 +378,10 @@ func TestTranspile_SimpleWeb(t *testing.T) {
 comquad's existing `tests/integration/` harness. The library itself does not start podman or systemd.
 
 ### Test Conventions
-- Fixture compose files live in `testdata/` at the package root (to be created with Tier 2/3 tests).
+- Fixture compose files live in `testdata/` at the package root.
 - Table-driven tests use `t.Run()` for each entry with descriptive names.
-- Golden files for serialization live in `testdata/serialization/` with `.golden` extension (to be created).
-- Test helper functions (`assertSectionKey`, `loadFixture`) are shared in a `helpers_test.go` file at the package root.
+- Golden files for serialization live in `testdata/serialization/` with `.golden` extension.
+- Test helper functions (`loadProject`, `findUnit`, `hasSection`, `hasDirectiveValue`) are shared in `helpers_test.go` at the package root.
 - No external test dependencies beyond the standard library and compose-go/v2.
 - **Empty-default pattern**: every unit type gets a test verifying that a `QuadletUnit` with only mandatory fields serializes correctly — catches section rendering bugs early.
 - **Round-trip pattern**: for serialization, every test verifying serialization should also verify deserialization produces the same struct.
@@ -360,8 +395,8 @@ From the project scope document:
 3. **Opinionated defaults** — all comquad transforms ported as opt-out `TranspileOption`s ✅
 4. **Deploy + systemd** — `deploy.resources`, `deploy.restart_policy` mapped to `[Service]` ✅
 5. **Secrets + builds** — compose `secrets:` and `build:` handled natively ✅
-6. **Integration** — comquad imports the library, drops podlet dependency
-7. **Deprecate podlet** — comquad no longer requires podlet binary at runtime
+6. **Integration** — comquad imports the library, drops podlet dependency 🔜
+7. **Deprecate podlet** — comquad no longer requires podlet binary at runtime 🔜
 
 ## Key Design Decisions
 

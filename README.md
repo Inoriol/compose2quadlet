@@ -20,11 +20,12 @@ import (
 )
 
 func main() {
-    project, _ := cli.NewProjectOptions(
+    opts, _ := cli.NewProjectOptions(
         []string{"compose.yaml"},
         cli.WithOsEnv,
         cli.WithDotEnv,
-    ).LoadProject(context.Background())
+    )
+    project, _ := opts.LoadProject(context.Background())
 
     units, _ := c2q.Transpile(project,
         c2q.WithProjectName("myapp"),
@@ -56,6 +57,7 @@ func main() {
   - `image.go`, `build.go` — companion `.image` and `.build` structural units
   - `network.go`, `volume.go` — top-level `.network` and `.volume` structural units
   - `secrets.go` — pre-mapping interceptor for secrets and configs
+- **`opinionated/`** — Composable post-processing transforms (prefix, references, SELinux, labels, default network, port offset, auto-update, install section)
 - **`serialization/`** — `Marshal()`, `Write()`, `Unmarshal()` for ini-format serialization
 
 ## Dependencies

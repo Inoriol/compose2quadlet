@@ -24,8 +24,7 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 		}
 		if build.Dockerfile != "" {
 			dirs = append(dirs, c2qtypes.Directive{Key: "File", Values: []string{build.Dockerfile}})
-		}
-		if build.DockerfileInline != "" {
+		} else if build.DockerfileInline != "" {
 			dirs = append(dirs, c2qtypes.Directive{Key: "File", Values: []string{build.DockerfileInline}})
 		}
 		if build.Target != "" {
@@ -37,8 +36,8 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 		if build.NoCache {
 			dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--no-cache"}})
 		}
-		for k, v := range build.Labels {
-			dirs = append(dirs, c2qtypes.Directive{Key: "Label", Values: []string{fmt.Sprintf("%s=%s", k, v)}})
+		for _, k := range sortedKeys(build.Labels) {
+			dirs = append(dirs, c2qtypes.Directive{Key: "Label", Values: []string{fmt.Sprintf("%s=%s", k, build.Labels[k])}})
 		}
 		for _, tag := range build.Tags {
 			dirs = append(dirs, c2qtypes.Directive{Key: "ImageTag", Values: []string{tag}})
@@ -50,7 +49,8 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 		}
 		if len(build.Args) > 0 {
 			if cfg.PodmanVersion.AtLeast(5, 7) {
-				for k, v := range build.Args {
+				for _, k := range sortedKeys(build.Args) {
+					v := build.Args[k]
 					if v != nil {
 						dirs = append(dirs, c2qtypes.Directive{Key: "BuildArg", Values: []string{k + "=" + *v}})
 					} else {

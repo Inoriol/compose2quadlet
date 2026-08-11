@@ -48,8 +48,8 @@ func Images(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 		}
 
 		if cfg.PodmanVersion.AtLeast(5, 5) {
-			dirs = append(dirs, c2qtypes.Directive{Key: "Retry", Values: []string{"3"}})
-			dirs = append(dirs, c2qtypes.Directive{Key: "RetryDelay", Values: []string{strconv.FormatInt(5*1e9, 10)}})
+			dirs = append(dirs, c2qtypes.Directive{Key: "Retry", Values: []string{strconv.Itoa(cfg.ImageRetry)}})
+			dirs = append(dirs, c2qtypes.Directive{Key: "RetryDelay", Values: []string{strconv.FormatInt(int64(cfg.ImageRetryDelay)*1e9, 10)}})
 		}
 
 		units = append(units, c2qtypes.QuadletUnit{

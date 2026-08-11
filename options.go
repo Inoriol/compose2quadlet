@@ -17,3 +17,5 @@ func WithAutoUpdate() types.Option          { return types.WithAutoUpdate() }
 func WithoutInstallSection() types.Option   { return types.WithoutInstallSection() }
 func WithoutNetworkAliases() types.Option   { return types.WithoutNetworkAliases() }
 func WithPodmanVersion(v Version) types.Option { return types.WithPodmanVersion(v) }
+func WithImageRetry(n int) types.Option      { return types.WithImageRetry(n) }
+func WithImageRetryDelay(s int) types.Option  { return types.WithImageRetryDelay(s) }

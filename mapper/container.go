@@ -30,8 +30,15 @@ func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 				Message: "requires podman >= 5.2.0",
 				Since:   "5.2.0",
 			})
-		} else {
+		}
+		if cfg.PodmanVersion.AtLeast(5, 2) {
 			dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{svc.Name + ".build"}})
+		} else if svc.Image != "" {
+			if cfg.PodmanVersion.AtLeast(4, 8) {
+				dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{svc.Name + ".image"}})
+			} else {
+				dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{svc.Image}})
+			}
 		}
 	} else if cfg.PodmanVersion.AtLeast(4, 8) {
 		if svc.Image != "" {
@@ -173,8 +180,9 @@ func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 	}
 	if len(svc.Sysctls) > 0 {
 		if cfg.PodmanVersion.AtLeast(4, 6) {
-			for k, v := range svc.Sysctls {
-				dirs = append(dirs, c2qtypes.Directive{Key: "Sysctl", Values: []string{k + "=" + v}})
+			sysKeys := sortedKeys(svc.Sysctls)
+			for _, k := range sysKeys {
+				dirs = append(dirs, c2qtypes.Directive{Key: "Sysctl", Values: []string{k + "=" + svc.Sysctls[k]}})
 			}
 		} else {
 			cfg.Warn(c2qtypes.Warning{
@@ -227,7 +235,6 @@ func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 				Message: "requires podman >= 4.7.0",
 				Since:   "4.7.0",
 			})
-			break
 		}
 	}
 	if svc.StopGracePeriod != nil {
@@ -270,11 +277,11 @@ func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 		}
 	}
 
-	for k, v := range svc.Labels {
-		dirs = append(dirs, c2qtypes.Directive{Key: "Label", Values: []string{fmt.Sprintf("%s=%s", k, v)}})
+	for _, k := range sortedKeys(svc.Labels) {
+		dirs = append(dirs, c2qtypes.Directive{Key: "Label", Values: []string{fmt.Sprintf("%s=%s", k, svc.Labels[k])}})
 	}
-	for k, v := range svc.Annotations {
-		dirs = append(dirs, c2qtypes.Directive{Key: "Annotation", Values: []string{fmt.Sprintf("%s=%s", k, v)}})
+	for _, k := range sortedKeys(svc.Annotations) {
+		dirs = append(dirs, c2qtypes.Directive{Key: "Annotation", Values: []string{fmt.Sprintf("%s=%s", k, svc.Annotations[k])}})
 	}
 	for _, c := range svc.CapAdd {
 		dirs = append(dirs, c2qtypes.Directive{Key: "AddCapability", Values: []string{c}})
@@ -397,6 +404,9 @@ func warnP4Container(svc types.ServiceConfig, cfg *c2qtypes.Config) {
 	}
 
 	for name, net := range svc.Networks {
+		if net == nil {
+			continue
+		}
 		if net.Priority != 0 {
 			p4("networks." + name + ".priority", "Swarm/compose concept")
 		}
@@ -420,7 +430,8 @@ func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 		dirs = append(dirs, c2qtypes.Directive{Key: "Exec", Values: []string{strings.Join(svc.Command, " ")}})
 	}
 
-	for k, v := range svc.Environment {
+	for _, k := range sortedKeys(svc.Environment) {
+		v := svc.Environment[k]
 		if v != nil {
 			dirs = append(dirs, c2qtypes.Directive{Key: "Environment", Values: []string{k + "=" + *v}})
 		} else {
@@ -450,8 +461,8 @@ func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 		}
 		if len(svc.Logging.Options) > 0 {
 			if cfg.PodmanVersion.AtLeast(5, 2) {
-				for k, v := range svc.Logging.Options {
-					dirs = append(dirs, c2qtypes.Directive{Key: "LogOpt", Values: []string{k + "=" + v}})
+				for _, k := range sortedKeys(svc.Logging.Options) {
+					dirs = append(dirs, c2qtypes.Directive{Key: "LogOpt", Values: []string{k + "=" + svc.Logging.Options[k]}})
 				}
 			} else {
 				cfg.Warn(c2qtypes.Warning{
@@ -467,21 +478,20 @@ func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 		if svc.LogDriver != "" {
 			dirs = append(dirs, c2qtypes.Directive{Key: "LogDriver", Values: []string{svc.LogDriver}})
 		}
-		for k, v := range svc.LogOpt {
+		for _, k := range sortedKeys(svc.LogOpt) {
 			if cfg.PodmanVersion.AtLeast(5, 2) {
-				dirs = append(dirs, c2qtypes.Directive{Key: "LogOpt", Values: []string{k + "=" + v}})
-			} else {
-				cfg.Warn(c2qtypes.Warning{
-					Level:   c2qtypes.WarningSkipped,
-					Service: svc.Name,
-					Field:   "logging.options",
-					Message: "requires podman >= 5.2.0",
-					Since:   "5.2.0",
-				})
-				break
-			}
+				dirs = append(dirs, c2qtypes.Directive{Key: "LogOpt", Values: []string{k + "=" + svc.LogOpt[k]}})
+		} else {
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningSkipped,
+				Service: svc.Name,
+				Field:   "logging.options",
+				Message: "requires podman >= 5.2.0",
+				Since:   "5.2.0",
+			})
 		}
 	}
+}
 
 	if svc.PidsLimit != 0 {
 		if cfg.PodmanVersion.AtLeast(4, 7) {
@@ -497,30 +507,11 @@ func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 		}
 	}
 
-	for name, u := range svc.Ulimits {
-		if !cfg.PodmanVersion.AtLeast(4, 7) {
-			cfg.Warn(c2qtypes.Warning{
-				Level:   c2qtypes.WarningSkipped,
-				Service: svc.Name,
-				Field:   "ulimits",
-				Message: "requires podman >= 4.7.0",
-				Since:   "4.7.0",
-			})
-			break
-		}
-		var val string
-		if u.Single > 0 {
-			val = strconv.Itoa(u.Single)
-		} else {
-			val = strconv.Itoa(u.Soft) + ":" + strconv.Itoa(u.Hard)
-		}
-		dirs = append(dirs, c2qtypes.Directive{Key: "Ulimit", Values: []string{name + "=" + val}})
-	}
 
 	if len(svc.ExtraHosts) > 0 {
 		if cfg.PodmanVersion.AtLeast(5, 3) {
-			for host, ips := range svc.ExtraHosts {
-				for _, ip := range ips {
+			for _, host := range sortedKeys(svc.ExtraHosts) {
+				for _, ip := range svc.ExtraHosts[host] {
 					dirs = append(dirs, c2qtypes.Directive{Key: "AddHost", Values: []string{host + ":" + ip}})
 				}
 			}
@@ -569,6 +560,9 @@ func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 	} else if svc.NetworkMode == "" || svc.NetworkMode == "bridge" {
 		for name, net := range svc.Networks {
 			dirs = append(dirs, c2qtypes.Directive{Key: "Network", Values: []string{name + ".network"}})
+			if net == nil {
+				continue
+			}
 			if net.Ipv4Address != "" {
 				dirs = append(dirs, c2qtypes.Directive{Key: "IP", Values: []string{net.Ipv4Address}})
 			}
@@ -648,7 +642,7 @@ func t3Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--mac-address " + svc.MacAddress}})
 	}
 	for _, net := range svc.Networks {
-		if net.MacAddress != "" {
+		if net != nil && net.MacAddress != "" {
 			dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--mac-address " + net.MacAddress}})
 		}
 	}
@@ -676,8 +670,8 @@ func t3Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 	for _, rule := range svc.DeviceCgroupRules {
 		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--device-cgroup-rule " + rule}})
 	}
-	for k, v := range svc.StorageOpt {
-		dirs = append(dirs, c2qtypes.Directive{Key: "GlobalArgs", Values: []string{"--storage-opt " + k + "=" + v}})
+	for _, k := range sortedKeys(svc.StorageOpt) {
+		dirs = append(dirs, c2qtypes.Directive{Key: "GlobalArgs", Values: []string{"--storage-opt " + k + "=" + svc.StorageOpt[k]}})
 	}
 	if svc.OomKillDisable {
 		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--oom-kill-disable"}})

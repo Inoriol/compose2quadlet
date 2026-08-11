@@ -64,7 +64,7 @@ func cpu(svc types.ServiceConfig, cfg *c2qtypes.Config, deploy *types.DeployConf
 	if svc.CPUPeriod > 0 {
 		dirs = append(dirs, c2qtypes.Directive{Key: "CPUQuotaPeriodSec", Values: []string{fmt.Sprintf("%dms", svc.CPUPeriod/1000)}})
 	}
-	if svc.CPUQuota > 0 {
+	if svc.CPUQuota > 0 && svc.CPUS == 0 {
 		dirs = append(dirs, c2qtypes.Directive{Key: "CPUQuota", Values: []string{fmt.Sprintf("%d%%", svc.CPUQuota/1000)}})
 	}
 	if svc.CPUSet != "" {
@@ -72,11 +72,11 @@ func cpu(svc types.ServiceConfig, cfg *c2qtypes.Config, deploy *types.DeployConf
 	}
 
 	if deploy != nil {
-		if deploy.Resources.Limits != nil && deploy.Resources.Limits.NanoCPUs > 0 {
+		if deploy.Resources.Limits != nil && deploy.Resources.Limits.NanoCPUs > 0 && svc.CPUS == 0 && svc.CPUQuota == 0 {
 			quota := int(math.Round(float64(deploy.Resources.Limits.NanoCPUs) * 100 / 1e9))
 			dirs = append(dirs, c2qtypes.Directive{Key: "CPUQuota", Values: []string{fmt.Sprintf("%d%%", quota)}})
 		}
-		if deploy.Resources.Reservations != nil && deploy.Resources.Reservations.NanoCPUs > 0 {
+		if deploy.Resources.Reservations != nil && deploy.Resources.Reservations.NanoCPUs > 0 && svc.CPUShares == 0 {
 			weight := max(1, int(math.Round(float64(deploy.Resources.Reservations.NanoCPUs) * 100 / 1e9)))
 			dirs = append(dirs, c2qtypes.Directive{Key: "CPUWeight", Values: []string{strconv.Itoa(weight)}})
 		}
@@ -142,11 +142,10 @@ func blkio(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
 func restart(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
 	var dirs []c2qtypes.Directive
 
-	if restartDirective(svc.Restart) {
-		dirs = append(dirs, resolveRestart(svc.Restart)...)
-	}
 	if svc.Deploy != nil && svc.Deploy.RestartPolicy != nil {
 		dirs = append(dirs, deployRestart(svc.Deploy.RestartPolicy)...)
+	} else if restartDirective(svc.Restart) {
+		dirs = append(dirs, resolveRestart(svc.Restart)...)
 	}
 
 	return dirs
@@ -210,7 +209,8 @@ func ulimitsP2(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directi
 		return nil
 	}
 	var dirs []c2qtypes.Directive
-	for name, u := range svc.Ulimits {
+	for _, name := range sortedKeys(svc.Ulimits) {
+		u := svc.Ulimits[name]
 		key := "Limit" + strings.ToUpper(name)
 		var val string
 		if u.Single > 0 {

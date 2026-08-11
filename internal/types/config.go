@@ -1,17 +1,19 @@
 package types
 
 type Config struct {
-	SelinuxContext  bool
-	FilePrefix      string
-	DefaultNetwork  bool
-	PortOffset      int
-	ProjectName     string
-	Labels          map[string]string
-	AutoUpdate      bool
-	InstallSection  bool
-	NetworkAliases  bool
-	PodmanVersion   Version
-	Warnings        []Warning
+	SelinuxContext   bool
+	FilePrefix       string
+	DefaultNetwork   bool
+	PortOffset       int
+	ProjectName      string
+	Labels           map[string]string
+	AutoUpdate       bool
+	InstallSection   bool
+	NetworkAliases   bool
+	PodmanVersion    Version
+	Warnings         []Warning
+	ImageRetry       int
+	ImageRetryDelay  int
 }
 
 type Version struct {
@@ -33,13 +35,15 @@ func (v Version) AtLeast(major, minor int) bool {
 
 func DefaultConfig() *Config {
 	return &Config{
-		SelinuxContext: true,
-		FilePrefix:     "cq-",
-		DefaultNetwork: true,
-		PortOffset:     0,
-		AutoUpdate:     false,
-		InstallSection: true,
-		NetworkAliases: true,
+		SelinuxContext:  true,
+		FilePrefix:      "cq-",
+		DefaultNetwork:  true,
+		PortOffset:      0,
+		AutoUpdate:      false,
+		InstallSection:  true,
+		NetworkAliases:  true,
+		ImageRetry:      3,
+		ImageRetryDelay: 5,
 	}
 }
 
@@ -87,6 +91,14 @@ func WithoutNetworkAliases() Option {
 
 func WithPodmanVersion(v Version) Option {
 	return func(c *Config) { c.PodmanVersion = v }
+}
+
+func WithImageRetry(n int) Option {
+	return func(c *Config) { c.ImageRetry = n }
+}
+
+func WithImageRetryDelay(seconds int) Option {
+	return func(c *Config) { c.ImageRetryDelay = seconds }
 }
 
 func (c *Config) Warn(w Warning) {

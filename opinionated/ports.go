@@ -36,28 +36,20 @@ func ApplyPortOffset(units []c2qtypes.QuadletUnit, cfg *c2qtypes.Config) []c2qty
 }
 
 func offsetPort(port string, offset int) string {
-	parts := strings.Split(port, ":")
-	last := len(parts) - 1
-	targetProto := parts[last]
 	proto := ""
-	if idx := strings.IndexByte(targetProto, '/'); idx >= 0 {
-		proto = targetProto[idx:]
-		targetProto = targetProto[:idx]
+	if idx := strings.LastIndexByte(port, '/'); idx >= 0 {
+		proto = port[idx:]
+		port = port[:idx]
 	}
-
+	parts := strings.Split(port, ":")
 	if len(parts) == 1 {
-		return port
+		port = parts[0]
+	} else {
+		hostIdx := len(parts) - 2
+		if n, err := strconv.Atoi(parts[hostIdx]); err == nil {
+			parts[hostIdx] = strconv.Itoa(n + offset)
+		}
+		port = strings.Join(parts, ":")
 	}
-
-	publishIdx := last - 1
-	publishPart := parts[publishIdx]
-	if n, err := strconv.Atoi(publishPart); err == nil {
-		parts[publishIdx] = strconv.Itoa(n + offset)
-	}
-
-	port = strings.Join(parts, ":")
-	if proto != "" {
-		port = strings.Replace(port, targetProto, targetProto+proto, 1)
-	}
-	return port
+	return port + proto
 }

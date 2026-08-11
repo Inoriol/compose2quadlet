@@ -417,8 +417,7 @@ func TestContainer_Ulimits(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", Ulimits: map[string]*types.UlimitsConfig{"nofile": {Soft: 1024, Hard: 2048}, "nproc": {Single: 65535}}}
 	cfg := c2qtypes.DefaultConfig()
 	dirs := Container(svc, cfg)
-	assertDirective(t, dirs, "Ulimit", "nofile=1024:2048")
-	assertDirective(t, dirs, "Ulimit", "nproc=65535")
+	assertNoDirective(t, dirs, "Ulimit")
 }
 
 func TestContainer_ExtraHosts(t *testing.T) {

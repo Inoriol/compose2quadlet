@@ -1,33 +1,78 @@
 # Implementation TODO
 
+## Milestones (from ARCHITECTURE.md)
+
+| # | Milestone | Status |
+|---|---|---|
+| 1 | MVP — `.container` files only, priority-1 field mappings | ✅ Done |
+| 2 | Full compose parity — `.network`, `.volume`, `.image`, `.build`, all P1+P2 | ✅ Done |
+| 3 | Opinionated defaults — all comquad transforms ported | ✅ Done |
+| 4 | Deploy + systemd — `deploy.resources`, `deploy.restart_policy` | ✅ Done |
+| 5 | Secrets + builds — `secrets:` and `build:` handled natively | ✅ Done |
+| 6 | Integration — comquad imports the library, drops podlet dependency | ❌ |
+| 7 | Deprecate podlet — comquad no longer requires podlet binary at runtime | ❌ |
+
+## Testing Gaps (from ARCHITECTURE.md)
+
+### Tier 0 — Serialization
+
+| # | Item | Description |
+|---|---|---|
+| T0-1 | Golden files | ✅ Done — `testdata/serialization/` with `.golden` files for container, network, volume, image, build |
+| T0-2 | Round-trip completeness | ✅ Done — round-trip tests for `.network`, `.volume`, `.image`, `.build` + empty directive round-trip |
+
+### Tier 2 — Version Matrix
+
+| # | Item | Description |
+|---|---|---|
+| T2-1 | Version boundary tests | ✅ Done — `TestVersion_Entrypoint_P3toP1`, `TestVersion_StopSignal_Gate`, `TestVersion_ExtraHosts_Gate` |
+| T2-2 | Feature availability gates | ✅ Done — `TestVersion_NetworkAliases_Gate`, `TestVersion_LogOptions_Gate`, `TestVersion_Build_Available` |
+| T2-3 | Section-switching fields | ✅ Done — `TestVersion_MemorySectionSwitch` |
+| T2-4 | Fatal structural blocks | ✅ Done — `TestVersion_Build_FatalError` |
+| T2-5 | Warning collection | ✅ Done — `TestVersion_WarningCollectionSmoke` + mapper-level warning tests |
+
+### Tier 3 — Pipeline Integration
+
+| # | Item | Description |
+|---|---|---|
+| T3-1 | Integration tests | ✅ Done — `transpile_test.go` with fixture YAML files in `testdata/` |
+| T3-2 | Service combos | ✅ Done — `TestTranspile_SimpleWeb`, `TestTranspile_MultiService`, `TestTranspile_TopLevelOnly` |
+| T3-3 | Option combinatorics | ✅ Done — `TestTranspile_OptionCombinatorics` (install+autoupdate, selinux+default network, port offset, default prefix) |
+| T3-4 | Warning verification | ✅ Done — mapper-level `TestContainer_VersionGatedWarnings` + pipeline `TestVersion_*` tests |
+| T3-5 | Edge cases | ✅ Done — `TestTranspile_EdgeCases_BuildService`, `TestTranspile_ExternalVolumesSkipped` |
+
+### Tier 4 — End-to-End
+
+Deferred to comquad's `tests/integration/` harness. The library itself does not start podman or systemd.
+
 ## Code Quality Issues (from code review)
 
 ### Critical
 
-| # | Issue | Location | Description |
-|---|---|---|---|
-| 279 | Non-deterministic map iteration | `mapper/container.go:176,273,276,423,453,470,500,522` + others | Maps like `Labels`, `Annotations`, `Environment`, `Sysctls`, `Logging.Options`, `LogOpt`, `Ulimits`, `ExtraHosts` produce different directive ordering on each run. Breaks reproducibility and golden file testing. **Fix**: Sort keys before iteration. |
-| 280 | Build + Image logic bug | `mapper/container.go:24-42` | When `svc.Build != nil` and podman < 5.2, fatal warning emitted but no `Image=` directive generated (else-if branches skipped). Results in containers with no Image directive. **Fix**: Add fallback logic or early return after fatal warning. |
-| 281 | Conflicting CPU directives | `mapper/service.go:56-69` | Both `svc.CPUs` and `svc.CPUQuota` emit `CPUQuota=` directives. If both set, they conflict and last one wins. **Fix**: Prioritize one over the other or merge correctly. |
-| 282 | Conflicting restart directives | `mapper/service.go:142-153` | Both `svc.Restart` and `svc.Deploy.RestartPolicy` can emit `Restart=` directives with no precedence logic. **Fix**: Check if `Deploy.RestartPolicy` exists and skip `svc.Restart` if so. |
+| # | Issue | Status |
+|---|---|---|
+| 279 | Non-deterministic map iteration | ✅ Fixed — sorted keys via `sortedKeys()` helper |
+| 280 | Build + Image logic bug | ✅ Fixed — added Image fallback for < 5.2 |
+| 281 | Conflicting CPU directives | ✅ Fixed — `svc.CPUs` takes priority over `svc.CPUQuota` and `deploy` |
+| 282 | Conflicting restart directives | ✅ Fixed — `Deploy.RestartPolicy` takes priority over `svc.Restart` |
 
 ### Medium
 
-| # | Issue | Location | Description |
-|---|---|---|---|
-| 283 | Incomplete port offset logic | `opinionated/ports.go:38-63` | Returns early for single-port format like `"80"` but doesn't handle `"80/udp"`. Complex string manipulation is error-prone. **Fix**: Parse port format more robustly. |
-| 284 | SELinux false positives | `opinionated/selinux.go:27` | Uses `strings.Contains(d.Values[vi], ":z")` which matches substrings. Path like `/data:zoo:/mnt` would incorrectly skip SELinux labeling. **Fix**: Check for `:z` or `:Z` only at end or after proper parsing. |
-| 285 | Missing opinionated tests | `opinionated/` package | No test files for critical transforms (prefix, references, SELinux, port offset, etc.). **Fix**: Add comprehensive tests for all opinionated transforms. |
-| 286 | Hardcoded retry values | `mapper/image.go:50-53` | `Retry=3` and `RetryDelay=5s` hardcoded. TODO.md mentions these should come from config, but no config option exists. **Fix**: Add config options or document as intentional defaults. |
+| # | Issue | Status |
+|---|---|---|
+| 283 | Incomplete port offset logic | ✅ Fixed — rewritten to strip protocol first, then offset |
+| 284 | SELinux false positives | ✅ Fixed — `hasSELinuxContext()` checks last colon segment only |
+| 285 | Missing opinionated tests | ✅ Fixed — 25 tests covering all transforms |
+| 286 | Hardcoded retry values | ✅ Fixed — added `WithImageRetry()` and `WithImageRetryDelay()` options |
 
 ### Minor
 
-| # | Issue | Location | Description |
-|---|---|---|---|
-| 287 | Redundant bool conversion | `mapper/network.go:13`, `mapper/volume.go:13` | `bool(nc.External)` unnecessary since `External` is already bool type. |
-| 288 | Potential Dockerfile conflict | `mapper/build.go:28-30` | Both `Dockerfile` and `DockerfileInline` can emit `File=` directives. If both set, two `File=` directives emitted. |
-| 289 | ServiceName undocumented | `mapper/container.go:46-58` | Emits `ServiceName=` directive but not listed in TODO.md. May be intentional but lacks documentation. |
-| 290 | Inefficient fatal warning handling | `transpile.go:73-77` | Fatal warnings checked after all processing completes. Wastes CPU cycles on work that will be discarded. |
-| 291 | DNSOpts warning break | `mapper/container.go:219-232` | Loop breaks after first warning, only one warning emitted even with multiple options. Inconsistent with other similar loops. |
-| 292 | Ulimits emitted twice | `mapper/container.go:500-518` + `mapper/service.go:208-224` | Ulimits emit both `Ulimit=` (P1) and `LimitXXX=` (P2) directives. May cause conflicts or confusion. |
-| 293 | Config mode formatting | `mapper/secrets.go:112` | `ref.Mode.String()` may not format octal modes correctly for quadlet. |
+| # | Issue | Status |
+|---|---|---|
+| 287 | Redundant bool conversion | ✅ Fixed — removed `bool()` wrapper |
+| 288 | Potential Dockerfile conflict | ✅ Fixed — `Dockerfile` takes priority over `DockerfileInline` |
+| 289 | ServiceName undocumented | ✅ Verified — already present in `doc/mapping.md` line 417 |
+| 290 | Inefficient fatal warning handling | ✅ Fixed — fatal check moved before `opinionated.Apply()` |
+| 291 | DNSOpts warning break | ✅ Fixed — removed `break`, now warns for all unsupported DNS opts |
+| 292 | Ulimits emitted twice | ✅ Fixed — removed P1 `Ulimit=` from container.go (P2 systemd limits preferred) |
+| 293 | Config mode formatting | ✅ Fixed — `os.FileMode` formatted as octal `%04o` |
