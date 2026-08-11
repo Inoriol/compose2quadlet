@@ -6,6 +6,8 @@ func defaultConfig() *types.Config {
 	return types.DefaultConfig()
 }
 
+func ParseVersion(s string) (Version, error) { return types.ParseVersion(s) }
+
 func WithoutSELinux() types.Option     { return types.WithoutSELinux() }
 func WithoutPrefix() types.Option       { return types.WithoutPrefix() }
 func WithPrefix(p string) types.Option  { return types.WithPrefix(p) }
@@ -19,3 +21,8 @@ func WithoutNetworkAliases() types.Option   { return types.WithoutNetworkAliases
 func WithPodmanVersion(v Version) types.Option { return types.WithPodmanVersion(v) }
 func WithImageRetry(n int) types.Option      { return types.WithImageRetry(n) }
 func WithImageRetryDelay(s int) types.Option  { return types.WithImageRetryDelay(s) }
+func WithWorkingDirectory(p string) types.Option      { return types.WithWorkingDirectory(p) }
+func WithSecretsDirectory(p string) types.Option      { return types.WithSecretsDirectory(p) }
+func WithDryRun() types.Option                        { return types.WithDryRun() }
+func WithBuildCacheDir(p string) types.Option         { return types.WithBuildCacheDir(p) }
+func WithDockerfileNormalization() types.Option       { return types.WithDockerfileNormalization() }

@@ -1,19 +1,30 @@
 package types
 
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
 type Config struct {
-	SelinuxContext   bool
-	FilePrefix       string
-	DefaultNetwork   bool
-	PortOffset       int
-	ProjectName      string
-	Labels           map[string]string
-	AutoUpdate       bool
-	InstallSection   bool
-	NetworkAliases   bool
-	PodmanVersion    Version
-	Warnings         []Warning
-	ImageRetry       int
-	ImageRetryDelay  int
+	SelinuxContext      bool
+	FilePrefix          string
+	DefaultNetwork      bool
+	PortOffset          int
+	ProjectName         string
+	Labels              map[string]string
+	AutoUpdate          bool
+	InstallSection      bool
+	NetworkAliases      bool
+	PodmanVersion       Version
+	Warnings            []Warning
+	ImageRetry          int
+	ImageRetryDelay     int
+	WorkingDirectory    string
+	SecretsDir          string
+	DryRun              bool
+	BuildCacheDir       string
+	NormalizeDockerfile bool
 }
 
 type Version struct {
@@ -101,6 +112,49 @@ func WithImageRetryDelay(seconds int) Option {
 	return func(c *Config) { c.ImageRetryDelay = seconds }
 }
 
+func WithWorkingDirectory(path string) Option {
+	return func(c *Config) { c.WorkingDirectory = path }
+}
+
+func WithSecretsDirectory(path string) Option {
+	return func(c *Config) { c.SecretsDir = path }
+}
+
+func WithDryRun() Option {
+	return func(c *Config) { c.DryRun = true }
+}
+
+func WithBuildCacheDir(path string) Option {
+	return func(c *Config) { c.BuildCacheDir = path }
+}
+
+func WithDockerfileNormalization() Option {
+	return func(c *Config) { c.NormalizeDockerfile = true }
+}
+
 func (c *Config) Warn(w Warning) {
 	c.Warnings = append(c.Warnings, w)
+}
+
+func ParseVersion(s string) (Version, error) {
+	s = strings.TrimPrefix(s, "v")
+	parts := strings.SplitN(s, ".", 3)
+	if len(parts) < 2 {
+		return Version{}, fmt.Errorf("invalid version %q: expected major.minor[.patch]", s)
+	}
+	v := Version{}
+	major, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return Version{}, fmt.Errorf("invalid major version %q: %w", parts[0], err)
+	}
+	v.Major = major
+	minor, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return Version{}, fmt.Errorf("invalid minor version %q: %w", parts[1], err)
+	}
+	v.Minor = minor
+	if len(parts) == 3 {
+		v.Patch, _ = strconv.Atoi(parts[2])
+	}
+	return v, nil
 }

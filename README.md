@@ -12,6 +12,32 @@ Replaces the `podlet` binary dependency with a native Go library. Eliminates the
 
 ## Usage
 
+**Quick path** — `TranspileFile` loads the compose file with `.env` resolution and transpiles in one call:
+
+```go
+import (
+    c2q "github.com/inoriol/compose2quadlet"
+    "github.com/inoriol/compose2quadlet/serialization"
+)
+
+func main() {
+    units, _ := c2q.TranspileFile("compose.yaml",
+        c2q.WithProjectName("myapp"),
+        c2q.WithPortOffset(10000),
+        c2q.WithAutoUpdate(),
+        c2q.WithLabels(map[string]string{
+            "com.myorg.managed": "true",
+            "com.myorg.project": "myapp",
+        }),
+    )
+
+    // Write all units to a directory
+    serialization.WriteUnits("/etc/containers/systemd", units)
+}
+```
+
+**Full control** — load the compose-go project yourself and call `Transpile`:
+
 ```go
 import (
     c2q "github.com/inoriol/compose2quadlet"
@@ -49,7 +75,7 @@ func main() {
 
 ## Packages
 
-- **Root** — `Transpile()`, core types (`QuadletUnit`, `Section`, `Directive`), option constructors
+- **Root** — `Transpile()`, `TranspileFile()`, `ParseVersion()`, core types (`QuadletUnit`, `Section`, `Directive`), option constructors
 - **`mapper/`** — Field mapping: compose-go `ServiceConfig` / `*Project` → quadlet directives and units
   - `container.go`, `healthcheck.go`, `security.go`, `ports.go` — per-service container directives
   - `service.go` — systemd `[Service]` resource-control and restart directives
@@ -57,8 +83,9 @@ func main() {
   - `image.go`, `build.go` — companion `.image` and `.build` structural units
   - `network.go`, `volume.go` — top-level `.network` and `.volume` structural units
   - `secrets.go` — pre-mapping interceptor for secrets and configs
+  - `dockerfile.go` — `PatchDockerfileFROM()` normalizes bare image names in Dockerfile FROM lines
 - **`opinionated/`** — Composable post-processing transforms (prefix, references, SELinux, labels, default network, port offset, auto-update, install section)
-- **`serialization/`** — `Marshal()`, `Write()`, `Unmarshal()` for ini-format serialization
+- **`serialization/`** — `Marshal()`, `Write()`, `WriteUnits()`, `Unmarshal()` for ini-format serialization
 
 ## Dependencies
 

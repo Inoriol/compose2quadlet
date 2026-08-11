@@ -32,7 +32,7 @@ footer of each option in `systemd.resource-control`.
 
 ## Project Scope
 
-**Library, not a CLI.** No `main()`, no cobra, no command-line interface. The single entry point is `Transpile()`.
+**Library, not a CLI.** No `main()`, no cobra, no command-line interface. Two entry points: `Transpile()` for callers who already have a compose-go `*types.Project`, and `TranspileFile()` which loads the compose file and transpiles in one call.
 
 **Narrow focus:** compose → quadlet only. No Kubernetes, no pods, no artifacts. Only quadlet types relevant to compose: `.container`, `.network`, `.volume`, `.image`, `.build`.
 
@@ -48,7 +48,7 @@ compose2quadlet/
 │
 ├── TODO.md                   # Known issues and planned improvements
 ├── types.go                  # Type aliases re-exporting from internal/types/
-├── transpile.go              # Entry point: Transpile(project, opts...) → ([]QuadletUnit, error)
+├── transpile.go              # Entry points: Transpile(project, opts...), TranspileFile(path, opts...)
 ├── options.go                # TranspileOption constructors, delegates to internal/types/
 ├── helpers_test.go           # Shared test helpers for root-level tests
 ├── version_test.go           # Tier 2 — version matrix tests
@@ -86,8 +86,9 @@ compose2quadlet/
 │   ├── build.go              # Builds() — .build quadlets (fatal error pre-5.2.0)
 │   ├── network.go            # Networks() — top-level .network quadlets
 │   ├── volume.go             # Volumes() — top-level .volume quadlets
-│   ├── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor
-│   └── helpers.go            # sortedKeys() — deterministic map key ordering
+│   ├── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor (env, file, external)
+│   ├── dockerfile.go          # PatchDockerfileFROM() — normalize bare image names in FROM lines
+│   └── helpers.go             # sortedKeys() — deterministic map key ordering
 │
 ├── opinionated/              # Opinionated transforms
 │   ├── opinionated.go        # Apply() — orchestrates all transforms
@@ -102,7 +103,7 @@ compose2quadlet/
 │   └── install.go            # ApplyInstallSection() — add [Install] section
 │
 ├── serialization/            # Serialization / deserialization
-│   └── ini.go                # Marshal(), Write(), Unmarshal()
+│   └── ini.go                # Marshal(), Write(), WriteUnits(), Unmarshal()
 │
 └── doc/
     └── mapping.md            # Complete field-by-field mapping reference
@@ -170,6 +171,7 @@ Transpile(project, opts...)
     ├── 2. Secrets pre-mapping intercept
     │       secrets → Volume= / Secret= in [Container]
     │       configs → Mount=type=bind in [Container]
+    │       Environment-based secrets resolved when WithSecretsDirectory() is set
     │       (strips secrets/configs from model before field mapping)
     │
     ├── 3. Field mapping phase (mapper/)
@@ -179,7 +181,7 @@ Transpile(project, opts...)
     │       ├── healthcheck.go: healthcheck → HealthCmd= etc. ✅
     │       ├── service.go:  systemd resources/restart → [Service] directives (P2) ✅
     │       ├── image.go:    image → .image quadlet ✅
-    │       └── build.go:    build → .build quadlet ✅
+    │       └── build.go:    build → .build quadlet (with optional Dockerfile FROM normalization) ✅
     │
     ├── 4. Top-level networks/volumes → .network/.volume quadlets ✅
     │       ├── network.go:  project.Networks → .network units ✅
@@ -278,6 +280,12 @@ All transforms are **enabled by default** and can be individually disabled via `
 | AutoUpdate | `WithAutoUpdate()` | Adds `AutoUpdate=registry` to containers |
 | Install section | `WithoutInstallSection()` | Adds `[Install] WantedBy=default.target` |
 | Image retry | `WithImageRetry(N)` / `WithImageRetryDelay(S)` | Sets `Retry=`/`RetryDelay=` on `.image` units (default: 3 / 5s) |
+| Working directory | `WithWorkingDirectory(path)` | Resolves relative bind-mount volume paths against this directory |
+| Secrets directory | `WithSecretsDirectory(path)` | Enables environment-based secret resolution; writes managed files to this dir |
+| Dry run | `WithDryRun()` | Skips writing managed secret files to disk (still generates directives) |
+| Dockerfile normalization | `WithDockerfileNormalization()` + `WithBuildCacheDir(path)` | Patches Dockerfile FROM lines to fully-qualified image names |
+| Version parsing | `ParseVersion(s)` | Parses `"5.2.0"` or `"v4.8"` into `Version` for `WithPodmanVersion()` |
+| Batch write | `serialization.WriteUnits(dir, units)` | Writes all units to a directory with `<name>.<type>` filenames |
 
 ## Quadlet-Specific Behaviors
 
@@ -298,6 +306,24 @@ The mapper must output these `.network`/`.volume`/`.image`/`.build` suffixes so 
 ### Dependency Translation
 
 `[Unit]` directives (`After=`, `Requires=`, `Wants=`, `BindsTo=`, `PartOf=`) between quadlet units are automatically translated by the quadlet generator. For example, `After=db.container` in a `web.container` unit creates a proper systemd `After=db.service` dependency.
+
+### Dockerfile FROM Normalization
+
+Podman resolves bare image names differently from Docker. When `WithDockerfileNormalization()` and `WithBuildCacheDir(path)` are set, `Builds()` calls `PatchDockerfileFROM()` to normalize `FROM` lines:
+- `nginx:alpine` → `docker.io/library/nginx:alpine`
+- `library/redis` → `docker.io/library/redis`
+- Multi-stage build aliases are tracked and not normalized
+- `--platform` flags are preserved
+- `FROM scratch` is never normalized
+- Patched copies are written to `BuildCacheDir` before the `.build` quadlet is emitted
+
+### Environment-Based Secret Resolution
+
+When `WithSecretsDirectory(path)` is set, `PremapSecrets()` resolves `secrets:` entries that reference environment variables:
+- Reads the env var via `os.Getenv(def.Environment)`
+- Writes the value to `path/<secret_name>` with `0600` permissions
+- Emits `Volume=<path>:/run/secrets/<name>:ro` in `[Container]`
+- `WithDryRun()` skips disk writes but still generates correct directives
 
 ## Conventions
 
@@ -411,3 +437,6 @@ Splitting image pulls into a separate unit enables proper dependency ordering. T
 
 ### Why pre-mapping intercept for secrets?
 Secrets and configs need different handling depending on their type (external vs file vs environment). Intercepting them before the field mapper runs avoids collision with the volume mapper and ensures correct `Secret=` vs `Volume=` routing.
+
+### Why normalize Dockerfile FROM lines?
+Podman resolves `FROM nginx:latest` as `localhost/nginx:latest` (treating bare names as local registry), while Docker resolves it as `docker.io/library/nginx:latest`. The build will fail without normalization. Patching in the library avoids forcing every consumer to know about this podman-specific quirk.

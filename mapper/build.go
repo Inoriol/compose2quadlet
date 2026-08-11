@@ -1,7 +1,10 @@
 package mapper
 
 import (
+	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	c2qtypes "github.com/inoriol/compose2quadlet/internal/types"
@@ -22,6 +25,20 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 		if build.Context != "" {
 			dirs = append(dirs, c2qtypes.Directive{Key: "SetWorkingDirectory", Values: []string{build.Context}})
 		}
+
+		if cfg.NormalizeDockerfile && build.Dockerfile != "" && cfg.BuildCacheDir != "" {
+			content, err := os.ReadFile(build.Dockerfile)
+			if err == nil {
+				patched, err := PatchDockerfileFROM(bytes.NewReader(content))
+				if err == nil {
+					patchedPath := filepath.Join(cfg.BuildCacheDir, name+".Dockerfile")
+					os.MkdirAll(filepath.Dir(patchedPath), 0755)
+					os.WriteFile(patchedPath, patched, 0644)
+					build.Dockerfile = patchedPath
+				}
+			}
+		}
+
 		if build.Dockerfile != "" {
 			dirs = append(dirs, c2qtypes.Directive{Key: "File", Values: []string{build.Dockerfile}})
 		} else if build.DockerfileInline != "" {

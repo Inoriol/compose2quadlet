@@ -3,6 +3,7 @@ package mapper
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	c2qtypes "github.com/inoriol/compose2quadlet/internal/types"
@@ -76,13 +77,39 @@ func processSecret(serviceName string, ref types.ServiceSecretConfig, def types.
 	}
 
 	if def.Environment != "" {
-		cfg.Warn(c2qtypes.Warning{
-			Level:   c2qtypes.WarningDegraded,
-			Service: serviceName,
-			Field:   "secrets." + ref.Source,
-			Message: "environment secrets not pre-resolved; use file or external instead",
-		})
-		return nil
+		if cfg.SecretsDir == "" {
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningDegraded,
+				Service: serviceName,
+				Field:   "secrets." + ref.Source,
+				Message: "environment secrets require WithSecretsDirectory()",
+			})
+			return nil
+		}
+		val := os.Getenv(def.Environment)
+		if val == "" {
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningDegraded,
+				Service: serviceName,
+				Field:   "secrets." + ref.Source,
+				Message: fmt.Sprintf("environment variable %q is not set or empty", def.Environment),
+			})
+			return nil
+		}
+		sourcePath := filepath.Join(cfg.SecretsDir, ref.Source)
+		if !cfg.DryRun {
+			if err := os.MkdirAll(cfg.SecretsDir, 0700); err != nil {
+				return nil
+			}
+			if err := os.WriteFile(sourcePath, []byte(val), 0600); err != nil {
+				return nil
+			}
+		}
+		target := ref.Target
+		if target == "" {
+			target = "/run/secrets/" + ref.Source
+		}
+		return []c2qtypes.Directive{{Key: "Volume", Values: []string{sourcePath + ":" + target + ":ro"}}}
 	}
 
 	return nil

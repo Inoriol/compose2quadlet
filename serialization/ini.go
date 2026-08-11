@@ -3,6 +3,8 @@ package serialization
 import (
 	"bufio"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	c2q "github.com/inoriol/compose2quadlet/internal/types"
@@ -22,6 +24,28 @@ func Write(w io.Writer, units []c2q.QuadletUnit) error {
 			}
 		}
 		if err := writeUnit(w, u); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func WriteUnits(dir string, units []c2q.QuadletUnit) error {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	for _, u := range units {
+		fileName := u.Name + "." + string(u.Type)
+		path := filepath.Join(dir, fileName)
+		f, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+		if err := writeUnit(f, u); err != nil {
+			f.Close()
+			return err
+		}
+		if err := f.Close(); err != nil {
 			return err
 		}
 	}

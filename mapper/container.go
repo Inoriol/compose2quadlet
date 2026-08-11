@@ -2,6 +2,7 @@ package mapper
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -528,7 +529,7 @@ func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 
 	for _, v := range svc.Volumes {
 		if v.Type == types.VolumeTypeBind {
-			dirs = append(dirs, c2qtypes.Directive{Key: "Mount", Values: []string{formatBindMount(v)}})
+			dirs = append(dirs, c2qtypes.Directive{Key: "Mount", Values: []string{formatBindMount(v, cfg.WorkingDirectory)}})
 		} else if v.Type == types.VolumeTypeTmpfs {
 			dirs = append(dirs, c2qtypes.Directive{Key: "Tmpfs", Values: []string{formatTmpfsMount(v)}})
 		} else {
@@ -590,10 +591,14 @@ func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 	return dirs
 }
 
-func formatBindMount(v types.ServiceVolumeConfig) string {
+func formatBindMount(v types.ServiceVolumeConfig, workDir string) string {
 	var parts []string
 	parts = append(parts, "type=bind")
-	parts = append(parts, "source="+v.Source)
+	source := v.Source
+	if workDir != "" && !filepath.IsAbs(source) {
+		source = filepath.Join(workDir, source)
+	}
+	parts = append(parts, "source="+source)
 	parts = append(parts, "destination="+v.Target)
 	if v.ReadOnly {
 		parts = append(parts, "readonly")

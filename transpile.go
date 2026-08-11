@@ -1,8 +1,11 @@
 package compose2quadlet
 
 import (
+	"context"
 	"errors"
+	"path/filepath"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/inoriol/compose2quadlet/mapper"
 	"github.com/inoriol/compose2quadlet/opinionated"
@@ -77,4 +80,33 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 	units = opinionated.Apply(units, cfg)
 
 	return units, nil
+}
+
+func TranspileFile(composePath string, opts ...TranspileOption) ([]QuadletUnit, error) {
+	absPath, err := filepath.Abs(composePath)
+	if err != nil {
+		return nil, err
+	}
+	dir := filepath.Dir(absPath)
+
+	projectOpts, err := cli.NewProjectOptions(
+		[]string{absPath},
+		cli.WithOsEnv,
+		cli.WithDotEnv,
+		cli.WithWorkingDirectory(dir),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	project, err := projectOpts.LoadProject(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	opts = append(opts,
+		WithWorkingDirectory(dir),
+	)
+
+	return Transpile(project, opts...)
 }
