@@ -6,7 +6,7 @@ type Config struct {
 	DefaultNetwork  bool
 	PortOffset      int
 	ProjectName     string
-	ManagedLabel    bool
+	Labels          map[string]string
 	AutoUpdate      bool
 	InstallSection  bool
 	NetworkAliases  bool
@@ -37,7 +37,6 @@ func DefaultConfig() *Config {
 		FilePrefix:     "cq-",
 		DefaultNetwork: true,
 		PortOffset:     0,
-		ManagedLabel:   true,
 		AutoUpdate:     false,
 		InstallSection: true,
 		NetworkAliases: true,
@@ -70,8 +69,8 @@ func WithProjectName(name string) Option {
 	return func(c *Config) { c.ProjectName = name }
 }
 
-func WithoutManagedLabel() Option {
-	return func(c *Config) { c.ManagedLabel = false }
+func WithLabels(labels map[string]string) Option {
+	return func(c *Config) { c.Labels = labels }
 }
 
 func WithAutoUpdate() Option {

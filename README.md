@@ -29,6 +29,11 @@ func main() {
     units, _ := c2q.Transpile(project,
         c2q.WithProjectName("myapp"),
         c2q.WithPortOffset(10000),
+        c2q.WithAutoUpdate(),
+        c2q.WithLabels(map[string]string{
+            "com.myorg.managed": "true",
+            "com.myorg.project": "myapp",
+        }),
     )
 
     for _, u := range units {

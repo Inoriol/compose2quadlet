@@ -5,6 +5,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/inoriol/compose2quadlet/mapper"
+	"github.com/inoriol/compose2quadlet/opinionated"
 )
 
 func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, error) {
@@ -66,6 +67,8 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 
 	volUnits := mapper.Volumes(project.Volumes, cfg)
 	units = append(units, volUnits...)
+
+	units = opinionated.Apply(units, cfg)
 
 	for _, w := range cfg.Warnings {
 		if w.Level == WarningFatal {

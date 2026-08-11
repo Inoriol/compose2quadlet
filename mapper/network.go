@@ -52,6 +52,25 @@ func Networks(networks types.Networks, cfg *c2qtypes.Config) []c2qtypes.QuadletU
 		if nc.EnableIPv6 != nil && *nc.EnableIPv6 {
 			dirs = append(dirs, c2qtypes.Directive{Key: "IPv6", Values: []string{"true"}})
 		}
+		if nc.Attachable {
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningSkipped,
+				Service: name,
+				Field:   "networks." + name + ".attachable",
+				Message: "swarm overlay only",
+			})
+		}
+		for _, pool := range nc.Ipam.Config {
+			if len(pool.AuxiliaryAddresses) > 0 {
+				cfg.Warn(c2qtypes.Warning{
+					Level:   c2qtypes.WarningSkipped,
+					Service: name,
+					Field:   "networks." + name + ".ipam.config.aux_addresses",
+					Message: "no quadlet directive",
+				})
+				break
+			}
+		}
 		for k, v := range nc.Labels {
 			if cfg.PodmanVersion.AtLeast(5, 6) {
 				dirs = append(dirs, c2qtypes.Directive{Key: "Label", Values: []string{fmt.Sprintf("%s=%s", k, v)}})

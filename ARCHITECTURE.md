@@ -46,6 +46,7 @@ compose2quadlet/
 ├── README.md                 # End-user documentation
 ├── go.mod                    # module github.com/inoriol/compose2quadlet
 │
+├── TODO.md                   # Known issues and planned improvements
 ├── types.go                  # Type aliases re-exporting from internal/types/
 ├── transpile.go              # Entry point: Transpile(project, opts...) → ([]QuadletUnit, error)
 ├── options.go                # TranspileOption constructors, delegates to internal/types/
@@ -68,22 +69,23 @@ compose2quadlet/
 │   ├── volume.go             # Volumes() — top-level .volume quadlets
 │   └── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor
 │
-├── opinionated/              # Opinionated transforms (to be implemented)
+├── opinionated/              # Opinionated transforms
+│   ├── opinionated.go        # Apply() — orchestrates all transforms
+│   ├── prefix.go             # ApplyPrefix() — cq-<project>- prefix on all unit names
+│   ├── references.go         # ApplyReferences() — rewrite Network=, Volume=, After= references
+│   ├── aliases.go            # ApplyNetworkAliases() — inject NetworkAlias=<service> per network
+│   ├── selinux.go            # ApplySELinux() — add :z to volume mounts
+│   ├── labels.go             # ApplyLabels() — inject consumer-provided labels
+│   ├── network.go            # ApplyDefaultNetwork() — inject default network if needed
+│   ├── ports.go              # ApplyPortOffset() — apply port offset
+│   ├── autoupdate.go         # ApplyAutoUpdate() — add AutoUpdate=registry
+│   └── install.go            # ApplyInstallSection() — add [Install] section
 │
-├── serialization/            # Serialization / deserialization (implemented)
+├── serialization/            # Serialization / deserialization
 │   └── ini.go                # Marshal(), Write(), Unmarshal()
 │
-├── doc/
-│   └── mapping.md            # Complete field-by-field mapping reference
-│
-└── (reference files)
-    ├── podman-systemd.unit.5.md # Full quadlet spec
-    ├── systemd.unit
-    ├── systemd.service
-    ├── systemd.resource-control
-    ├── systemd.scope
-    ├── systemd.slice
-    └── deploy.md
+└── doc/
+    └── mapping.md            # Complete field-by-field mapping reference
 ```
 
 ## Core Types
@@ -163,14 +165,15 @@ Transpile(project, opts...)
     │       ├── network.go:  project.Networks → .network units ✅
     │       └── volume.go:   project.Volumes → .volume units ✅
     │
-    ├── 5. Opinionated transforms (opinionated/)
+    ├── 5. Opinionated transforms (opinionated/) ✅
     │       ├── prefix.go:       cq-<project>- prefix on all unit names
     │       ├── references.go:   rewrite Network=, Volume=, After= references
     │       ├── aliases.go:      inject NetworkAlias=<service> per network
     │       ├── selinux.go:      add :z to volume mounts
-    │       ├── labels.go:       inject com.comquad labels
+    │       ├── labels.go:       inject consumer-provided labels
     │       ├── network.go:      inject default network if needed
     │       ├── ports.go:        apply port offset
+    │       ├── autoupdate.go:   add AutoUpdate=registry
     │       └── install.go:      add [Install] section
     │
     ▼
@@ -246,8 +249,8 @@ All transforms are **enabled by default** and can be individually disabled via `
 | Reference rewriting | *(always on)* | Rewrites `Network=`, `Volume=`, `After=`, `Requires=` to prefixed names |
 | NetworkAlias injection | `WithoutNetworkAliases()` | Adds `NetworkAlias=<service>` for each network a service connects to |
 | SELinux `:z` | `WithoutSELinux()` | Appends `:z` to all bind-mount volumes |
-| Managed label | `WithoutManagedLabel()` | Adds `Label=com.comquad.managed=true` |
-| Project label | *(requires `WithProjectName()`)* | Adds `Label=com.comquad.project=<name>` |
+| Managed label | `WithLabels(map)` | Adds consumer-provided labels to every unit |
+| Project label | `WithLabels(map)` + `WithProjectName` | Adds consumer-provided labels to every unit |
 | Default network | `WithoutDefaultNetwork()` | Injects `cq-default.network` if no networks defined |
 | Port offset | `WithPortOffset(N)` | Adds offset to all host-side published ports |
 | AutoUpdate | `WithAutoUpdate()` | Adds `AutoUpdate=registry` to containers |
@@ -310,7 +313,7 @@ Output: expected `[]Directive` (or `[]QuadletUnit` for structural mappers).
 
 Tests focus on **correct output at latest podman version**. Version-gated behavior is tested in Tier 2.
 
-### Tier 2 — Version Matrix (`version_test.go` in package root)
+### Tier 2 — Version Matrix (planned)
 A dedicated test file that runs the same compose input through multiple target podman versions and asserts correct behavior per version boundary (4.8.0, 5.0.0, 5.2.0, 5.3.0, 5.5.0, 5.8.0, 6.0.0, 6.1.0). Covers:
 
 - Fields that promote from P3 PodmanArgs to P1 native directive (`entrypoint`, `stop_signal`, `extra_hosts`)
@@ -319,7 +322,7 @@ A dedicated test file that runs the same compose input through multiple target p
 - Structural blocks that cause fatal errors (`build` on < 5.2.0)
 - Correct `Warning` collection at each severity level
 
-### Tier 3 — Pipeline Integration (`transpile_test.go`)
+### Tier 3 — Pipeline Integration (planned)
 Full compose YAML → compose-go parse → `Transpile()` → verify `[]QuadletUnit` structure:
 - Single service, multi-service, no-service (top-level networks/volumes only)
 - Option combinatorics: pairs of enable/disable on opinionated transforms
@@ -340,10 +343,10 @@ func TestTranspile_SimpleWeb(t *testing.T) {
 comquad's existing `tests/integration/` harness. The library itself does not start podman or systemd.
 
 ### Test Conventions
-- Fixture compose files live in `testdata/` at the package root.
+- Fixture compose files live in `testdata/` at the package root (to be created with Tier 2/3 tests).
 - Table-driven tests use `t.Run()` for each entry with descriptive names.
-- Golden files for serialization live in `testdata/serialization/` with `.golden` extension.
-- Test helper functions (`assertSectionKey`, `loadFixture`) are shared in a `helpers_test.go` file.
+- Golden files for serialization live in `testdata/serialization/` with `.golden` extension (to be created).
+- Test helper functions (`assertSectionKey`, `loadFixture`) are shared in a `helpers_test.go` file at the package root.
 - No external test dependencies beyond the standard library and compose-go/v2.
 - **Empty-default pattern**: every unit type gets a test verifying that a `QuadletUnit` with only mandatory fields serializes correctly — catches section rendering bugs early.
 - **Round-trip pattern**: for serialization, every test verifying serialization should also verify deserialization produces the same struct.
@@ -354,7 +357,7 @@ From the project scope document:
 
 1. **MVP** — `.container` files only, priority-1 field mappings, no opinionated transforms ✅
 2. **Full compose parity** — `.network`, `.volume`, `.image`, `.build` support, all priority-1 + priority-2 ✅
-3. **Opinionated defaults** — all comquad transforms ported as opt-out `TranspileOption`s
+3. **Opinionated defaults** — all comquad transforms ported as opt-out `TranspileOption`s ✅
 4. **Deploy + systemd** — `deploy.resources`, `deploy.restart_policy` mapped to `[Service]` ✅
 5. **Secrets + builds** — compose `secrets:` and `build:` handled natively ✅
 6. **Integration** — comquad imports the library, drops podlet dependency

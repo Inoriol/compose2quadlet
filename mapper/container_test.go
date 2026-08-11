@@ -747,6 +747,33 @@ func TestContainer_OomKillDisable_P3(t *testing.T) {
 	assertDirective(t, dirs, "PodmanArgs", "--oom-kill-disable")
 }
 
+func TestContainer_Devices_HostContainerPerms(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Devices: []types.DeviceMapping{
+		{Source: "/dev/ttyUSB0", Target: "/dev/ttyUSB0", Permissions: "rwm"},
+	}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "AddDevice", "/dev/ttyUSB0:/dev/ttyUSB0:rwm")
+}
+
+func TestContainer_Devices_NoPerms(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Devices: []types.DeviceMapping{
+		{Source: "/dev/sda", Target: "/dev/sda"},
+	}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "AddDevice", "/dev/sda:/dev/sda")
+}
+
+func TestContainer_Devices_CDI(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Devices: []types.DeviceMapping{
+		{Source: "nvidia.com/gpu=all"},
+	}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "AddDevice", "nvidia.com/gpu=all")
+}
+
 func TestContainer_CgroupParent_P3(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", CgroupParent: "myapp.slice"}
 	cfg := c2qtypes.DefaultConfig()

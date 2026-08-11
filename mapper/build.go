@@ -68,6 +68,23 @@ func Builds(services types.Services, cfg *c2qtypes.Config) []c2qtypes.QuadletUni
 			}
 		}
 
+		if len(build.Platforms) > 0 {
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningSkipped,
+				Service: name,
+				Field:   "build.platforms",
+				Message: "multi-arch build not applicable",
+			})
+		}
+		if len(build.ExtraHosts) > 0 {
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningSkipped,
+				Service: name,
+				Field:   "build.extra_hosts",
+				Message: "no podman build equivalent",
+			})
+		}
+
 		units = append(units, c2qtypes.QuadletUnit{
 			Type:     c2qtypes.UnitBuild,
 			Name:     name,

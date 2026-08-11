@@ -286,7 +286,131 @@ func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 		dirs = append(dirs, c2qtypes.Directive{Key: "ExposeHostPort", Values: []string{e}})
 	}
 
+	for _, dev := range svc.Devices {
+		if dev.Target == "" {
+			dirs = append(dirs, c2qtypes.Directive{Key: "AddDevice", Values: []string{dev.Source}})
+		} else if dev.Permissions != "" {
+			dirs = append(dirs, c2qtypes.Directive{Key: "AddDevice", Values: []string{dev.Source + ":" + dev.Target + ":" + dev.Permissions}})
+		} else {
+			dirs = append(dirs, c2qtypes.Directive{Key: "AddDevice", Values: []string{dev.Source + ":" + dev.Target}})
+		}
+	}
+
+	warnP4Container(svc, cfg)
+
 	return dirs
+}
+
+func warnP4Container(svc types.ServiceConfig, cfg *c2qtypes.Config) {
+	p4 := func(field, message string) {
+		cfg.Warn(c2qtypes.Warning{
+			Level:   c2qtypes.WarningSkipped,
+			Service: svc.Name,
+			Field:   field,
+			Message: message,
+		})
+	}
+
+	if svc.Extends != nil {
+		p4("extends", "handled by compose-go loader")
+	}
+	if len(svc.ExternalLinks) > 0 {
+		p4("external_links", "legacy Docker field")
+	}
+	if len(svc.Links) > 0 {
+		p4("links", "legacy Docker field")
+	}
+	if len(svc.Profiles) > 0 {
+		p4("profiles", "handled by comquad at runtime")
+	}
+	if svc.Scale != nil && *svc.Scale > 0 {
+		p4("scale", "replaces deploy.replicas (Swarm orchestration)")
+	}
+	if svc.DomainName != "" {
+		p4("domainname", "legacy Swarm")
+	}
+	if svc.CredentialSpec != nil {
+		p4("credential_spec", "Windows-only")
+	}
+	if svc.Isolation != "" {
+		p4("isolation", "Windows/Swarm")
+	}
+	if svc.Attach != nil {
+		p4("attach", "Docker CLI concept")
+	}
+	if svc.Develop != nil {
+		p4("develop", "dev tooling")
+	}
+	if len(svc.VolumesFrom) > 0 {
+		p4("volumes_from", "Docker-only")
+	}
+	if svc.CPUCount > 0 {
+		p4("cpu_count", "Windows/macOS")
+	}
+	if svc.CPUPercent > 0 {
+		p4("cpu_percent", "Windows/macOS")
+	}
+	if len(svc.Gpus) > 0 {
+		p4("gpus", "no podman equivalent")
+	}
+
+	if svc.Deploy != nil {
+		if svc.Deploy.Mode != "" {
+			p4("deploy.mode", "Swarm orchestration")
+		}
+		if svc.Deploy.Replicas != nil && *svc.Deploy.Replicas > 0 {
+			p4("deploy.replicas", "Swarm orchestration")
+		}
+		if len(svc.Deploy.Placement.Constraints) > 0 {
+			p4("deploy.placement.constraints", "Swarm orchestration")
+		}
+		if len(svc.Deploy.Placement.Preferences) > 0 {
+			p4("deploy.placement.preferences", "Swarm orchestration")
+		}
+		if svc.Deploy.EndpointMode != "" {
+			p4("deploy.endpoint_mode", "Swarm orchestration")
+		}
+		if len(svc.Deploy.Labels) > 0 {
+			p4("deploy.labels", "Swarm orchestration")
+		}
+		if svc.Deploy.UpdateConfig != nil {
+			p4("deploy.update_config", "Swarm orchestration")
+		}
+		if svc.Deploy.RollbackConfig != nil {
+			p4("deploy.rollback_config", "Swarm orchestration")
+		}
+		if svc.Deploy.Resources.Reservations != nil && len(svc.Deploy.Resources.Reservations.Devices) > 0 {
+			p4("deploy.resources.reservations.devices", "Swarm orchestration")
+		}
+	}
+
+	for _, v := range svc.Volumes {
+		if v.Consistency != "" {
+			p4("volumes." + v.Target + ".consistency", "inconsequential in podman")
+		}
+		if v.Volume != nil && v.Volume.Subpath != "" {
+			p4("volumes." + v.Target + ".subpath", "Docker engine only (compose 2.27+)")
+		}
+		if v.Image != nil && v.Image.SubPath != "" {
+			p4("volumes." + v.Target + ".subpath", "Docker engine only")
+		}
+	}
+
+	for name, net := range svc.Networks {
+		if net.Priority != 0 {
+			p4("networks." + name + ".priority", "Swarm/compose concept")
+		}
+		if len(net.DriverOpts) > 0 {
+			p4("networks." + name + ".driver_opts", "per-service network opts not supported")
+		}
+	}
+
+	if strings.HasPrefix(svc.Ipc, "service:") {
+		p4("ipc:" + svc.Ipc, "no container IPC sharing")
+	}
+	if strings.HasPrefix(svc.Pid, "service:") {
+		p4("pid:" + svc.Pid, "no container PID namespace sharing")
+	}
 }
 
 func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
