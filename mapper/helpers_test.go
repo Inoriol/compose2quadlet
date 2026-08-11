@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -44,7 +45,7 @@ func hasDirective(dirs []c2qtypes.Directive, key, value string) bool {
 
 func hasWarning(cfg *c2qtypes.Config, service, field string) bool {
 	for _, w := range cfg.Warnings {
-		if w.Service == service && w.Field == field {
+		if w.Service == service && (w.Field == field || strings.Contains(w.Field, field)) {
 			return true
 		}
 	}

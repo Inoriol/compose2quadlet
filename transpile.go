@@ -15,7 +15,12 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 
 	var units []QuadletUnit
 
-	for name, svc := range project.Services {
+	for name := range project.Services {
+		svc := project.Services[name]
+
+		secretDirs := mapper.PremapSecrets(&svc, project.Secrets, project.Configs, cfg)
+		project.Services[name] = svc
+
 		var sections []Section
 
 		unitDirs := mapper.Unit(svc)
@@ -26,12 +31,15 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 		containerDirs := mapper.Container(svc, cfg)
 		hcDirs := mapper.Healthcheck(svc, cfg)
 		containerDirs = append(containerDirs, hcDirs...)
+		containerDirs = append(containerDirs, secretDirs...)
 
 		if len(containerDirs) > 0 {
 			sections = append(sections, Section{Name: SectionContainer, Directives: containerDirs})
 		}
 
 		serviceDirs := mapper.Service(svc, cfg)
+		depServiceDirs := mapper.UnitService(svc)
+		serviceDirs = append(serviceDirs, depServiceDirs...)
 		if len(serviceDirs) > 0 {
 			sections = append(sections, Section{Name: SectionService, Directives: serviceDirs})
 		}
@@ -46,6 +54,18 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 			Sections: sections,
 		})
 	}
+
+	imagUnits := mapper.Images(project.Services, cfg)
+	units = append(units, imagUnits...)
+
+	buildUnits := mapper.Builds(project.Services, cfg)
+	units = append(units, buildUnits...)
+
+	netUnits := mapper.Networks(project.Networks, cfg)
+	units = append(units, netUnits...)
+
+	volUnits := mapper.Volumes(project.Volumes, cfg)
+	units = append(units, volUnits...)
 
 	for _, w := range cfg.Warnings {
 		if w.Level == WarningFatal {

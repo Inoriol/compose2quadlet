@@ -32,3 +32,43 @@ func TestUnit_DependsOn_Empty(t *testing.T) {
 		t.Fatalf("expected no directives, got %v", dirs)
 	}
 }
+
+func TestUnit_DependsOn_ServiceHealthy(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"db": {Condition: "service_healthy", Required: true}}}
+	serviceDirs := UnitService(svc)
+	if len(serviceDirs) == 0 {
+		t.Fatal("expected ExecStartPre for service_healthy dependency")
+	}
+	assertDirective(t, serviceDirs, "ExecStartPre", "/bin/sh -c 'while ! /usr/bin/podman healthcheck run db.container; do sleep 1; done'")
+}
+
+func TestUnit_DependsOn_ServiceCompletedSuccessfully(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"init": {Condition: "service_completed_successfully", Required: true}}}
+	unitDirs := Unit(svc)
+
+	assertDirective(t, unitDirs, "Requires", "init.container")
+	assertDirective(t, unitDirs, "After", "init.container")
+
+	serviceDirs := UnitService(svc)
+	if len(serviceDirs) != 0 {
+		t.Fatal("expected no health polling for service_completed_successfully")
+	}
+}
+
+func TestUnit_DependsOn_MixedConditions(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{
+		"db":    {Condition: "service_healthy", Required: true},
+		"cache": {Condition: "service_started", Required: false},
+	}}
+	unitDirs := Unit(svc)
+	assertDirective(t, unitDirs, "Requires", "db.container")
+	assertDirective(t, unitDirs, "Wants", "cache.container")
+	assertDirective(t, unitDirs, "After", "db.container")
+	assertDirective(t, unitDirs, "After", "cache.container")
+
+	serviceDirs := UnitService(svc)
+	if len(serviceDirs) != 1 {
+		t.Fatalf("expected 1 ExecStartPre, got %d", len(serviceDirs))
+	}
+	assertDirective(t, serviceDirs, "ExecStartPre", "/bin/sh -c 'while ! /usr/bin/podman healthcheck run db.container; do sleep 1; done'")
+}

@@ -1,12 +1,18 @@
 package mapper
 
 import (
+	"fmt"
+
 	"github.com/compose-spec/compose-go/v2/types"
 	c2qtypes "github.com/inoriol/compose2quadlet/internal/types"
 )
 
 func Unit(svc types.ServiceConfig) []c2qtypes.Directive {
 	return dependsOn(svc.Name, svc.DependsOn)
+}
+
+func UnitService(svc types.ServiceConfig) []c2qtypes.Directive {
+	return dependsOnHealth(svc.DependsOn)
 }
 
 func dependsOn(serviceName string, deps types.DependsOnConfig) []c2qtypes.Directive {
@@ -37,6 +43,18 @@ func dependsOn(serviceName string, deps types.DependsOnConfig) []c2qtypes.Direct
 	}
 	if len(bindsTo) > 0 {
 		dirs = append(dirs, c2qtypes.Directive{Key: "BindsTo", Values: bindsTo})
+	}
+	return dirs
+}
+
+func dependsOnHealth(deps types.DependsOnConfig) []c2qtypes.Directive {
+	var dirs []c2qtypes.Directive
+	for name, dep := range deps {
+		if dep.Condition != "service_healthy" {
+			continue
+		}
+		cmd := fmt.Sprintf("/bin/sh -c 'while ! /usr/bin/podman healthcheck run %s.container; do sleep 1; done'", name)
+		dirs = append(dirs, c2qtypes.Directive{Key: "ExecStartPre", Values: []string{cmd}})
 	}
 	return dirs
 }

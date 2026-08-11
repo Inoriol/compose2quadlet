@@ -11,7 +11,7 @@ func TestContainer_Image(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", Image: "nginx:latest"}
 	cfg := c2qtypes.DefaultConfig()
 	dirs := Container(svc, cfg)
-	assertDirective(t, dirs, "Image", "nginx:latest")
+	assertDirective(t, dirs, "Image", "web.image")
 }
 
 func TestContainer_ContainerName(t *testing.T) {
@@ -635,4 +635,121 @@ func TestContainer_Tmpfs_LongSyntax(t *testing.T) {
 	cfg := c2qtypes.DefaultConfig()
 	dirs := Container(svc, cfg)
 	assertDirective(t, dirs, "Tmpfs", "/run:size=67108864,mode=3244")
+}
+
+func TestContainer_Tty(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Tty: true}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--tty")
+}
+
+func TestContainer_StdinOpen(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", StdinOpen: true}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--attach stdin")
+}
+
+func TestContainer_Runtime(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Runtime: "crun"}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "GlobalArgs", "--runtime crun")
+}
+
+func TestContainer_MacAddress(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", MacAddress: "02:42:ac:11:00:02"}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--mac-address 02:42:ac:11:00:02")
+}
+
+func TestContainer_MacAddress_PerNetwork(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Networks: map[string]*types.ServiceNetworkConfig{
+		"frontend": {MacAddress: "02:42:ac:11:00:03"},
+	}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--mac-address 02:42:ac:11:00:03")
+	assertDirective(t, dirs, "Network", "frontend.network")
+}
+
+func TestContainer_IpcShareable(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Ipc: "shareable"}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--ipc shareable")
+}
+
+func TestContainer_PidHost(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Pid: "host"}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--pid host")
+}
+
+func TestContainer_UtsHost(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Uts: "host"}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--uts host")
+}
+
+func TestContainer_Privileged(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Privileged: true}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--privileged")
+}
+
+func TestContainer_MemSwappiness(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", MemSwappiness: 60}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--memory-swappiness 60")
+}
+
+func TestContainer_CpuRtRuntime(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", CPURTRuntime: 50000}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--cpu-rt-runtime 50000")
+}
+
+func TestContainer_CpuRtPeriod(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", CPURTPeriod: 1000000}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--cpu-rt-period 1000000")
+}
+
+func TestContainer_DeviceCgroupRules(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", DeviceCgroupRules: []string{"c 13:* rwm", "b 7:* rmw"}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--device-cgroup-rule c 13:* rwm")
+	assertDirective(t, dirs, "PodmanArgs", "--device-cgroup-rule b 7:* rmw")
+}
+
+func TestContainer_StorageOpt(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", StorageOpt: map[string]string{"size": "10G", "override": "true"}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "GlobalArgs", "--storage-opt size=10G")
+	assertDirective(t, dirs, "GlobalArgs", "--storage-opt override=true")
+}
+
+func TestContainer_OomKillDisable_P3(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", OomKillDisable: true}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--oom-kill-disable")
+}
+
+func TestContainer_CgroupParent_P3(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", CgroupParent: "myapp.slice"}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--cgroup-parent myapp.slice")
 }

@@ -14,13 +14,30 @@ func Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directi
 	var dirs []c2qtypes.Directive
 	dirs = append(dirs, t0Container(svc, cfg)...)
 	dirs = append(dirs, t1Container(svc, cfg)...)
+	dirs = append(dirs, t3Container(svc, cfg)...)
 	return dirs
 }
 
 func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
 	var dirs []c2qtypes.Directive
 
-	if svc.Image != "" {
+	if svc.Build != nil {
+		if !cfg.PodmanVersion.AtLeast(5, 2) {
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningFatal,
+				Service: svc.Name,
+				Field:   "build",
+				Message: "requires podman >= 5.2.0",
+				Since:   "5.2.0",
+			})
+		} else {
+			dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{svc.Name + ".build"}})
+		}
+	} else if cfg.PodmanVersion.AtLeast(4, 8) {
+		if svc.Image != "" {
+			dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{svc.Name + ".image"}})
+		}
+	} else if svc.Image != "" {
 		dirs = append(dirs, c2qtypes.Directive{Key: "Image", Values: []string{svc.Image}})
 	}
 	if svc.ContainerName != "" {
@@ -489,4 +506,60 @@ func formatTmpfsMount(v types.ServiceVolumeConfig) string {
 		}
 	}
 	return val
+}
+
+func t3Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Directive {
+	var dirs []c2qtypes.Directive
+
+	if svc.Tty {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--tty"}})
+	}
+	if svc.StdinOpen {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--attach stdin"}})
+	}
+	if svc.Runtime != "" {
+		dirs = append(dirs, c2qtypes.Directive{Key: "GlobalArgs", Values: []string{"--runtime " + svc.Runtime}})
+	}
+	if svc.MacAddress != "" {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--mac-address " + svc.MacAddress}})
+	}
+	for _, net := range svc.Networks {
+		if net.MacAddress != "" {
+			dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--mac-address " + net.MacAddress}})
+		}
+	}
+	if svc.Ipc == "shareable" {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--ipc shareable"}})
+	}
+	if svc.Pid == "host" {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--pid host"}})
+	}
+	if svc.Uts == "host" {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--uts host"}})
+	}
+	if svc.Privileged {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--privileged"}})
+	}
+	if svc.MemSwappiness > 0 {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{fmt.Sprintf("--memory-swappiness %d", svc.MemSwappiness)}})
+	}
+	if svc.CPURTRuntime > 0 {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{fmt.Sprintf("--cpu-rt-runtime %d", svc.CPURTRuntime)}})
+	}
+	if svc.CPURTPeriod > 0 {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{fmt.Sprintf("--cpu-rt-period %d", svc.CPURTPeriod)}})
+	}
+	for _, rule := range svc.DeviceCgroupRules {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--device-cgroup-rule " + rule}})
+	}
+	for k, v := range svc.StorageOpt {
+		dirs = append(dirs, c2qtypes.Directive{Key: "GlobalArgs", Values: []string{"--storage-opt " + k + "=" + v}})
+	}
+	if svc.OomKillDisable {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--oom-kill-disable"}})
+	}
+	if svc.CgroupParent != "" {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--cgroup-parent " + svc.CgroupParent}})
+	}
+	return dirs
 }

@@ -44,7 +44,13 @@ func main() {
 ## Packages
 
 - **Root** — `Transpile()`, core types (`QuadletUnit`, `Section`, `Directive`), option constructors
-- **`mapper/`** — Field mapping: compose-go `ServiceConfig` → quadlet directives
+- **`mapper/`** — Field mapping: compose-go `ServiceConfig` / `*Project` → quadlet directives and units
+  - `container.go`, `healthcheck.go`, `security.go`, `ports.go` — per-service container directives
+  - `service.go` — systemd `[Service]` resource-control and restart directives
+  - `unit.go` — `depends_on` → `[Unit]` dependencies and health polling hooks
+  - `image.go`, `build.go` — companion `.image` and `.build` structural units
+  - `network.go`, `volume.go` — top-level `.network` and `.volume` structural units
+  - `secrets.go` — pre-mapping interceptor for secrets and configs
 - **`serialization/`** — `Marshal()`, `Write()`, `Unmarshal()` for ini-format serialization
 
 ## Dependencies

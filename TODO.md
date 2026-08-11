@@ -256,38 +256,38 @@ Fields with no native quadlet directive, requiring Passthrough formatting to
 
 File: `mapper/container.go` — P3 passthroughs
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 132 | `tty` | `PodmanArgs=--tty` | flag, no value | 4.6.0 |
-| 133 | `stdin_open` | `PodmanArgs=--attach stdin` | flag | 4.6.0 |
-| 134 | `runtime` | `GlobalArgs=--runtime <name>` | | 4.6.0 |
-| 135 | `mac_address` | `PodmanArgs=--mac-address ...` | | 4.6.0 |
-| 136 | `networks.mac_address` | `PodmanArgs=--mac-address ...` | per-network flag | 4.6.0 |
-| 137 | `ipc: shareable` | `PodmanArgs=--ipc shareable` | | 4.6.0 |
-| 138 | `pid: host` | `PodmanArgs=--pid host` | | 4.6.0 |
-| 139 | `uts: host` | `PodmanArgs=--uts host` | | 4.6.0 |
-| 140 | `privileged` | `PodmanArgs=--privileged` | flag | 4.6.0 |
-| 141 | `mem_swappiness` | `PodmanArgs=--memory-swappiness ...` | | 4.6.0 |
-| 142 | `cpu_rt_runtime` | `PodmanArgs=--cpu-rt-runtime ...` | | 4.6.0 |
-| 143 | `cpu_rt_period` | `PodmanArgs=--cpu-rt-period ...` | | 4.6.0 |
-| 144 | `device_cgroup_rules` | `PodmanArgs=--device-cgroup-rule ...` | multi-value | 4.6.0 |
-| 145 | `storage_opt` | `GlobalArgs=--storage-opt ...` | multi-value | 4.6.0 |
-| 146 | `oom_kill_disable` (P3 alt) | `PodmanArgs=--oom-kill-disable` | flag | 4.6.0 |
-| 147 | `cgroup_parent` (P3 alt) | `PodmanArgs=--cgroup-parent ...` | | 4.6.0 |
-| 148 | `entrypoint` (P3 fallback) | `PodmanArgs=--entrypoint ...` | pre-5.0.0 | 4.6.0 |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 132 | `tty` | `PodmanArgs=--tty` | flag, no value | 4.6.0 | ✅ |
+| 133 | `stdin_open` | `PodmanArgs=--attach stdin` | flag | 4.6.0 | ✅ |
+| 134 | `runtime` | `GlobalArgs=--runtime <name>` | | 4.6.0 | ✅ |
+| 135 | `mac_address` | `PodmanArgs=--mac-address ...` | | 4.6.0 | ✅ |
+| 136 | `networks.mac_address` | `PodmanArgs=--mac-address ...` | per-network flag | 4.6.0 | ✅ |
+| 137 | `ipc: shareable` | `PodmanArgs=--ipc shareable` | | 4.6.0 | ✅ |
+| 138 | `pid: host` | `PodmanArgs=--pid host` | | 4.6.0 | ✅ |
+| 139 | `uts: host` | `PodmanArgs=--uts host` | | 4.6.0 | ✅ |
+| 140 | `privileged` | `PodmanArgs=--privileged` | flag | 4.6.0 | ✅ |
+| 141 | `mem_swappiness` | `PodmanArgs=--memory-swappiness ...` | | 4.6.0 | ✅ |
+| 142 | `cpu_rt_runtime` | `PodmanArgs=--cpu-rt-runtime ...` | | 4.6.0 | ✅ |
+| 143 | `cpu_rt_period` | `PodmanArgs=--cpu-rt-period ...` | | 4.6.0 | ✅ |
+| 144 | `device_cgroup_rules` | `PodmanArgs=--device-cgroup-rule ...` | multi-value | 4.6.0 | ✅ |
+| 145 | `storage_opt` | `GlobalArgs=--storage-opt ...` | multi-value | 4.6.0 | ✅ |
+| 146 | `oom_kill_disable` (P3 alt) | `PodmanArgs=--oom-kill-disable` | flag | 4.6.0 | ✅ |
+| 147 | `cgroup_parent` (P3 alt) | `PodmanArgs=--cgroup-parent ...` | | 4.6.0 | ✅ |
+| 148 | `entrypoint` (P3 fallback) | `PodmanArgs=--entrypoint ...` | pre-5.0.0 | 4.6.0 | ✅ |
 
 File: `mapper/unit.go` — complex conditionals
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 149 | `depends_on` (`condition: service_healthy`) | `ExecStartPre=` [Service] | health polling hook | sd 208 |
-| 150 | `depends_on` (`condition: service_completed_successfully`) | `After=` / `Requires=` [Unit] | oneshot completion wait | 4.4.0 |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 149 | `depends_on` (`condition: service_healthy`) | `ExecStartPre=` [Service] | health polling hook | sd 208 | ✅ |
+| 150 | `depends_on` (`condition: service_completed_successfully`) | `After=` / `Requires=` [Unit] | oneshot completion wait | 4.4.0 | ✅ |
 
 File: `mapper/container.go` — misc hard
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 151 | `label_file` | `Label=` | read file, inline as Label= | — |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 151 | `label_file` | `Label=` | compose-go loader merges into `Labels` | — | ❌ |
 
 ---
 
@@ -298,20 +298,20 @@ multiple code paths depending on secret/config type.
 
 File: `mapper/secrets.go`
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 152 | `secrets` (short syntax) | *(pre-mapping)* | route to correct handler | — |
-| 153 | `secrets` (long, external) | `Secret=` | podman secret | 4.5.0 |
-| 154 | `secrets` (long, file) | `Volume=<path>:/run/secrets/<name>:ro` | bind mount | 4.4.0 |
-| 155 | `secrets` (long, environment) | `Volume=<path>:/run/secrets/<name>:ro` | same as file | 4.4.0 |
-| 156 | `configs` (short syntax) | `Mount=type=bind,source=<path>,target=/<name>` | bind mount | 4.5.0 |
-| 157 | `configs` (long syntax) | `Mount=type=bind,...` | full mount options | 4.5.0 |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 152 | `secrets` (short syntax) | *(pre-mapping)* | route to correct handler | — | ✅ |
+| 153 | `secrets` (long, external) | `Secret=` | podman secret | 4.5.0 | ✅ |
+| 154 | `secrets` (long, file) | `Volume=<path>:/run/secrets/<name>:ro` | bind mount | 4.4.0 | ✅ |
+| 155 | `secrets` (long, environment) | `Volume=<path>:/run/secrets/<name>:ro` | same as file | 4.4.0 | ❌ not pre-resolved |
+| 156 | `configs` (short syntax) | `Mount=type=bind,source=<path>,target=/<name>` | bind mount | 4.5.0 | ✅ |
+| 157 | `configs` (long syntax) | `Mount=type=bind,...` | full mount options | 4.5.0 | ✅ |
 
 File: `mapper/container.go` — version-gated entrypoint path
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 158 | `entrypoint` (version switch) | P1 `Entrypoint=` / P3 `PodmanArgs=--entrypoint` | central version-gate logic | 5.0.0 |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 158 | `entrypoint` (version switch) | P1 `Entrypoint=` / P3 `PodmanArgs=--entrypoint` | central version-gate logic | 5.0.0 | ✅ |
 
 ---
 
@@ -323,65 +323,65 @@ and cross-unit reference wiring.
 
 File: `mapper/image.go` — `.image` companion unit
 
-| # | Compose field | → Quadlet | Notes | Since |
-|---|---|---|---|---|
-| 159 | `image` (unit gen) | `.image` unit | one per service with `image:` | 4.8.0 |
-| 160 | `image` (Image directive) | `Image=` [Image] | in `.image` unit | 4.8.0 |
-| 161 | `pull_policy` (image unit) | `Policy=` [Image] | | 5.6.0 |
-| 162 | `platform` OS | `OS=` [Image] | parse `os/arch/variant` | 4.8.0 |
-| 163 | `platform` arch | `Arch=` [Image] | | 4.8.0 |
-| 164 | `platform` variant | `Variant=` [Image] | | 4.8.0 |
-| 165 | retries | `Retry=` [Image] | from config or default | 5.5.0 |
-| 166 | retry delay | `RetryDelay=` [Image] | from config or default | 5.5.0 |
+| # | Compose field | → Quadlet | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 159 | `image` (unit gen) | `.image` unit | one per service with `image:` | 4.8.0 | ✅ |
+| 160 | `image` (Image directive) | `Image=` [Image] | in `.image` unit | 4.8.0 | ✅ |
+| 161 | `pull_policy` (image unit) | `Policy=` [Image] | | 5.6.0 | ✅ |
+| 162 | `platform` OS | `OS=` [Image] | parse `os/arch/variant` | 4.8.0 | ✅ |
+| 163 | `platform` arch | `Arch=` [Image] | | 4.8.0 | ✅ |
+| 164 | `platform` variant | `Variant=` [Image] | | 4.8.0 | ✅ |
+| 165 | retries | `Retry=` [Image] | from config or default | 5.5.0 | ✅ |
+| 166 | retry delay | `RetryDelay=` [Image] | from config or default | 5.5.0 | ✅ |
 
 File: `mapper/build.go` — `.build` unit
 
-| # | Compose field | → Quadlet | Notes | Since |
-|---|---|---|---|---|
-| 167 | `build` (unit gen) | `.build` unit | fatal error pre-5.2.0 | 5.2.0 |
-| 168 | `build.context` | `SetWorkingDirectory=` [Build] | | 5.2.0 |
-| 169 | `build.dockerfile` | `File=` [Build] | | 5.2.0 |
-| 170 | `build.args` | `BuildArg=` [Build] | | 5.7.0 |
-| 171 | `build.target` | `Target=` [Build] | | 5.2.0 |
-| 172 | `build.labels` | `Label=` [Build] | | 5.2.0 |
-| 173 | `build.network` | `Network=` [Build] | | 5.2.0 |
-| 174 | `build.no_cache` | `PodmanArgs=--no-cache` [Build] | | 5.2.0 |
-| 175 | `build.secrets` | `Secret=` [Build] | | 5.2.0 |
-| 176 | `build.tags` | `ImageTag=` [Build] | | 5.2.0 |
+| # | Compose field | → Quadlet | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 167 | `build` (unit gen) | `.build` unit | fatal error pre-5.2.0 | 5.2.0 | ✅ |
+| 168 | `build.context` | `SetWorkingDirectory=` [Build] | | 5.2.0 | ✅ |
+| 169 | `build.dockerfile` | `File=` [Build] | | 5.2.0 | ✅ |
+| 170 | `build.args` | `BuildArg=` [Build] | | 5.7.0 | ✅ |
+| 171 | `build.target` | `Target=` [Build] | | 5.2.0 | ✅ |
+| 172 | `build.labels` | `Label=` [Build] | | 5.2.0 | ✅ |
+| 173 | `build.network` | `Network=` [Build] | | 5.2.0 | ✅ |
+| 174 | `build.no_cache` | `PodmanArgs=--no-cache` [Build] | | 5.2.0 | ✅ |
+| 175 | `build.secrets` | `Secret=` [Build] | | 5.2.0 | ✅ |
+| 176 | `build.tags` | `ImageTag=` [Build] | | 5.2.0 | ✅ |
 
 File: `mapper/network.go` — `.network` top-level unit
 
-| # | Compose field | → Quadlet | Notes | Since |
-|---|---|---|---|---|
-| 177 | `networks.<name>.driver` | `Driver=` [Network] | | 4.4.0 |
-| 178 | `networks.<name>.driver_opts` | `Options=` [Network] | map→key=value | 4.4.0 |
-| 179 | `networks.<name>.ipam.driver` | `IPAMDriver=` [Network] | | 4.4.0 |
-| 180 | `networks.<name>.ipam.config[].subnet` | `Subnet=` [Network] | multi-ipam | 4.4.0 |
-| 181 | `networks.<name>.ipam.config[].gateway` | `Gateway=` [Network] | | 4.4.0 |
-| 182 | `networks.<name>.ipam.config[].ip_range` | `IPRange=` [Network] | | 4.4.0 |
-| 183 | `networks.<name>.internal` | `Internal=` [Network] | | 4.4.0 |
-| 184 | `networks.<name>.enable_ipv6` | `IPv6=` [Network] | | 4.4.0 |
-| 185 | `networks.<name>.external` | *(skip generation)* | no unit emitted | — |
-| 186 | `networks.<name>.labels` | `Label=` [Network] | | 5.6.0 |
-| 187 | `networks.<name>.dns` | `DNS=` [Network] | | 4.7.0 |
-| 188 | `networks.<name>.interface_name` | `InterfaceName=` [Network] | | 5.6.0 |
-| 189 | `networks.<name>.disable_dns` | `DisableDNS=` [Network] | | ? |
-| 190 | `networks.<name>.delete_on_stop` | `NetworkDeleteOnStop=` [Network] | | 5.5.0 |
+| # | Compose field | → Quadlet | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 177 | `networks.<name>.driver` | `Driver=` [Network] | | 4.4.0 | ✅ |
+| 178 | `networks.<name>.driver_opts` | `Options=` [Network] | map→key=value | 4.4.0 | ✅ |
+| 179 | `networks.<name>.ipam.driver` | `IPAMDriver=` [Network] | | 4.4.0 | ✅ |
+| 180 | `networks.<name>.ipam.config[].subnet` | `Subnet=` [Network] | multi-ipam | 4.4.0 | ✅ |
+| 181 | `networks.<name>.ipam.config[].gateway` | `Gateway=` [Network] | | 4.4.0 | ✅ |
+| 182 | `networks.<name>.ipam.config[].ip_range` | `IPRange=` [Network] | | 4.4.0 | ✅ |
+| 183 | `networks.<name>.internal` | `Internal=` [Network] | | 4.4.0 | ✅ |
+| 184 | `networks.<name>.enable_ipv6` | `IPv6=` [Network] | | 4.4.0 | ✅ |
+| 185 | `networks.<name>.external` | *(skip generation)* | no unit emitted | — | ✅ |
+| 186 | `networks.<name>.labels` | `Label=` [Network] | | 5.6.0 | ✅ |
+| 187 | `networks.<name>.dns` | `DNS=` [Network] | | 4.7.0 | ❌ no field in compose-go |
+| 188 | `networks.<name>.interface_name` | `InterfaceName=` [Network] | | 5.6.0 | ❌ no field in compose-go |
+| 189 | `networks.<name>.disable_dns` | `DisableDNS=` [Network] | | ? | ❌ no field in compose-go |
+| 190 | `networks.<name>.delete_on_stop` | `NetworkDeleteOnStop=` [Network] | | 5.5.0 | ❌ no field in compose-go |
 
 File: `mapper/volume.go` — `.volume` top-level unit
 
-| # | Compose field | → Quadlet | Notes | Since |
-|---|---|---|---|---|
-| 191 | `volumes.<name>.driver` | `Driver=` [Volume] | | 4.7.0 |
-| 192 | `volumes.<name>.driver_opts` | `Options=` [Volume] | | 6.0.0 |
-| 193 | `volumes.<name>.external` | *(skip generation)* | no unit emitted | — |
-| 194 | `volumes.<name>.labels` | `Label=` [Volume] | | ? |
-| 195 | `volumes.<name>.name` | `VolumeName=` [Volume] | | 4.7.0 |
-| 196 | `volumes.<name>.uid` | `UID=` [Volume] | | 6.0.0 |
-| 197 | `volumes.<name>.gid` | `GID=` [Volume] | | 6.0.0 |
-| 198 | `volumes.<name>.copy` | `Copy=` [Volume] | | ? |
-| 199 | `volumes.<name>.device` | `Device=` [Volume] | | ? |
-| 200 | `volumes.<name>.type` | `Type=` [Volume] | | ? |
+| # | Compose field | → Quadlet | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 191 | `volumes.<name>.driver` | `Driver=` [Volume] | | 4.7.0 | ✅ |
+| 192 | `volumes.<name>.driver_opts` | `Options=` [Volume] | | 6.0.0 | ✅ |
+| 193 | `volumes.<name>.external` | *(skip generation)* | no unit emitted | — | ✅ |
+| 194 | `volumes.<name>.labels` | `Label=` [Volume] | | ? | ✅ |
+| 195 | `volumes.<name>.name` | `VolumeName=` [Volume] | | 4.7.0 | ✅ |
+| 196 | `volumes.<name>.uid` | `UID=` [Volume] | | 6.0.0 | ❌ no field in compose-go |
+| 197 | `volumes.<name>.gid` | `GID=` [Volume] | | 6.0.0 | ❌ no field in compose-go |
+| 198 | `volumes.<name>.copy` | `Copy=` [Volume] | | ? | ❌ no field in compose-go |
+| 199 | `volumes.<name>.device` | `Device=` [Volume] | | ? | ❌ no field in compose-go |
+| 200 | `volumes.<name>.type` | `Type=` [Volume] | | ? | ❌ no field in compose-go |
 
 ---
 
@@ -427,15 +427,91 @@ No mapping possible. Produce `WarningSkipped` for informational purposes.
 
 ---
 
+## T6 — T0 leftovers (devices parsing)
+
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 234 | `devices` (`HOST:CONTAINER[:PERMS]`) | `AddDevice=` | parse `DeviceMapping{}` struct | 4.4.0 | |
+| 235 | `devices` (CDI syntax) | `AddDevice=` | CDI path passthrough | 4.4.0 | |
+
+---
+
+## T7 — P4 warning implementation (emit `WarningSkipped`)
+
+These compose fields are unsupported. The mapper should detect them
+and emit `WarningSkipped` instead of silently ignoring.
+
+File: `mapper/container.go`
+
+| # | Compose field | Reason |
+|---|---|---|
+| 236 | `deploy.mode` | Swarm orchestration |
+| 237 | `deploy.replicas` | Swarm orchestration |
+| 238 | `deploy.placement.constraints` | Swarm orchestration |
+| 239 | `deploy.placement.preferences` | Swarm orchestration |
+| 240 | `deploy.endpoint_mode` | Swarm orchestration |
+| 241 | `deploy.labels` | Swarm orchestration |
+| 242 | `deploy.update_config` | Swarm orchestration |
+| 243 | `deploy.rollback_config` | Swarm orchestration |
+| 244 | `deploy.resources.reservations.devices` | Swarm orchestration |
+| 245 | `extends` | handled by compose-go loader |
+| 246 | `external_links` | legacy Docker |
+| 247 | `links` | legacy Docker |
+| 248 | `profiles` | runtime selection (comquad) |
+| 249 | `scale` | replaces deploy.replicas |
+| 250 | `domainname` | legacy Swarm |
+| 251 | `credential_spec` | Windows-only |
+| 252 | `isolation` | Windows/Swarm |
+| 253 | `attach` | Docker CLI concept |
+| 254 | `develop` | dev tooling |
+| 255 | `volumes_from` | Docker-only |
+| 256 | `volumes.subpath` | compose 2.27+ Docker engine only |
+| 257 | `volumes.consistency` | inconsequential in podman |
+| 258 | `cpu_count` | Windows/macOS |
+| 259 | `cpu_percent` | Windows/macOS |
+| 260 | `gpus` | no podman equivalent |
+| 261 | `build.platforms` | multi-arch build (not applicable) |
+| 262 | `build.extra_hosts` | no podman build equivalent |
+| 263 | `networks.priority` | swarm/compose concept |
+| 264 | `networks.driver_opts` | per-service network opts |
+| 265 | `ipc: service:<name>` | no container IPC sharing |
+| 266 | `pid: service:<name>` | no container PID namespace sharing |
+| 267 | `networks.<name>.attachable` | swarm overlay only |
+| 268 | `networks.<name>.ipam.config[].aux_addresses` | no quadlet directive |
+
+---
+
+## T8 — Opinionated transforms (`opinionated/` package)
+
+Port comquad's post-processing pipeline as opt-out `TranspileOption`s.
+
+| # | Transform | Option | File | Status |
+|---|---|---|---|---|
+| 269 | File prefixing (`cq-<project>-`) | `WithoutPrefix()` | `prefix.go` | |
+| 270 | Reference rewriting (Network=/Volume=/After=) | *(always on)* | `references.go` | |
+| 271 | NetworkAlias injection | `WithoutNetworkAliases()` | `aliases.go` | |
+| 272 | SELinux `:z` on bind mounts | `WithoutSELinux()` | `selinux.go` | |
+| 273 | Managed label (`com.comquad.managed=true`) | `WithoutManagedLabel()` | `labels.go` | |
+| 274 | Project label (`com.comquad.project=<name>`) | *(requires `WithProjectName()`)* | `labels.go` | |
+| 275 | Default network injection | `WithoutDefaultNetwork()` | `network.go` | |
+| 276 | Port offset | `WithPortOffset(N)` | `ports.go` | |
+| 277 | AutoUpdate injection | `WithAutoUpdate()` | `autoupdate.go` | |
+| 278 | Install section (`[Install] WantedBy=default.target`) | `WithoutInstallSection()` | `install.go` | |
+
+---
+
 ## Summary
 
 | Tier | Count | Done | Description |
 |---|---|---|---|
-| T0 | 51 | 35 | Trivial 1:1 passthrough (11 ❌ no compose-go field, 2 ⏳ moved up) |
+| T0 | 51 | 35 | Trivial 1:1 passthrough (11 ❌ no compose-go field, 2 ⏳ → T6) |
 | T1 | 38 | 30 | Easy formatting / type conversion (5 ❌ no compose-go field) |
 | T2 | 39 | 39 | Medium complexity, version gating |
-| T3 | 20 | 0 | Hard (P3 PodmanArgs, complex parsing) |
-| T4 | 7 | 0 | Very hard (secrets/configs interceptor) |
-| T5 | 42 | 0 | Structural (separate quadlet units) |
-| P4 | 33 | 0 | Unsupported (warn only) |
-| **Total** | **230** | **104** | |
+| T3 | 20 | 19 | Hard (P3 PodmanArgs, complex parsing) (1 ❌ compose-go handles) |
+| T4 | 7 | 6 | Very hard (secrets/configs interceptor) (1 ❌ env secrets not pre-resolved) |
+| T5 | 42 | 33 | Structural (separate quadlet units) (9 ❌ no compose-go field) |
+| P4 | 33 | 0 | Unsupported (warn only) — moved to T7 |
+| T6 | 2 | 0 | T0 leftovers (devices parsing) |
+| T7 | 33 | 0 | P4 warning implementation |
+| T8 | 10 | 0 | Opinionated transforms |
+| **Total** | **230** | **162** | |

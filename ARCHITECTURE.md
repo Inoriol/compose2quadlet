@@ -15,7 +15,8 @@ This document describes the internal design, conventions, and data flow of compo
 | **systemd.resource-control** | https://github.com/systemd/systemd/blob/main/man/systemd.resource-control.xml |
 | **systemd.exec** | https://github.com/systemd/systemd/blob/main/man/systemd.exec.xml |
 | **compose-go (Go types)** | https://github.com/compose-spec/compose-go |
-| **Podman Release Notes** | https://github.com/podman-container-tools/podman/blob/main/RELEASE_NOTES.md |
+| **Podman Release Notes up to v5.6.0** | https://github.com/podman-container-tools/podman/blob/main/RELEASE_NOTES.md |
+| **Podman Release Notes after v5.6.0** | https://github.com/podman-container-tools/podman/releases |
 
 ## Version Tracking
 
@@ -54,12 +55,18 @@ compose2quadlet/
 │       ├── core.go           # QuadletUnit, Section, Directive, Warning, WarningLevel, UnitType, section constants
 │       └── config.go         # Config, Version, Option, DefaultConfig(), Warn()
 │
-├── mapper/                   # Field mapping logic (implemented)
-│   ├── container.go          # Container(), t0Container(), t1Container() — P1 [Container] directives
-│   ├── unit.go               # Unit() — depends_on → [Unit] After=/Requires=/Wants=/BindsTo=
+├── mapper/                   # Field mapping logic
+│   ├── container.go          # Container(), t0Container(), t1Container(), t3Container() — P1 [Container] directives
+│   ├── service.go            # Service() — P2 [Service] directives (memory, CPU, IO, restart, deploy)
+│   ├── unit.go               # Unit(), UnitService() — depends_on → [Unit] deps + health polling
 │   ├── healthcheck.go        # Healthcheck() — healthcheck directives
 │   ├── security.go           # SecurityOpts() — security_opt parsing
-│   └── ports.go              # formatPort() helper
+│   ├── ports.go              # formatPort() helper
+│   ├── image.go              # Images() — .image companion quadlets
+│   ├── build.go              # Builds() — .build quadlets (fatal error pre-5.2.0)
+│   ├── network.go            # Networks() — top-level .network quadlets
+│   ├── volume.go             # Volumes() — top-level .volume quadlets
+│   └── secrets.go            # PremapSecrets() — secrets/configs pre-mapping interceptor
 │
 ├── opinionated/              # Opinionated transforms (to be implemented)
 │
@@ -67,17 +74,6 @@ compose2quadlet/
 │   └── ini.go                # Marshal(), Write(), Unmarshal()
 │
 ├── doc/
-│   └── mapping.md            # Complete field-by-field mapping reference
-│
-└── (reference files)
-    ├── podman-systemd.unit.5.md # Full quadlet spec
-    ├── systemd.unit
-    ├── systemd.service
-    ├── systemd.resource-control
-    ├── systemd.scope
-    ├── systemd.slice
-    └── deploy.md
-```
 │   └── mapping.md            # Complete field-by-field mapping reference
 │
 └── (reference files)
@@ -156,16 +152,16 @@ Transpile(project, opts...)
     │
     ├── 3. Field mapping phase (mapper/)
     │       For each service:
-    │       ├── container.go: service fields → [Container] directives (P1) ✅
-    │       ├── unit.go: depends_on → [Unit] After=/Requires= ✅
+    │       ├── container.go: service fields → [Container] directives (P1/P3) ✅
+    │       ├── unit.go: depends_on → [Unit] After=/Requires= + health polling ✅
     │       ├── healthcheck.go: healthcheck → HealthCmd= etc. ✅
-    │       ├── service.go:  deploy/resources → [Service] directives (P2)
-    │       ├── network.go:  networks → Network= + .network quadlet
-    │       ├── volume.go:   volumes  → Volume= + .volume quadlet
-    │       ├── image.go:    image    → .image quadlet
-    │       └── build.go:    build    → .build quadlet
+    │       ├── service.go:  systemd resources/restart → [Service] directives (P2) ✅
+    │       ├── image.go:    image → .image quadlet ✅
+    │       └── build.go:    build → .build quadlet ✅
     │
-    ├── 4. Top-level networks/volumes → .network/.volume quadlets
+    ├── 4. Top-level networks/volumes → .network/.volume quadlets ✅
+    │       ├── network.go:  project.Networks → .network units ✅
+    │       └── volume.go:   project.Volumes → .volume units ✅
     │
     ├── 5. Opinionated transforms (opinionated/)
     │       ├── prefix.go:       cq-<project>- prefix on all unit names
@@ -213,8 +209,7 @@ The library tracks a target podman version (via `WithPodmanVersion()` or default
 
 The version check is centralized:
 
-- **`mapper/mapper.go`** — A central version-gated field registry handles simple 1:1 fields where the P1 key is available from a minimum version and the P3 `PodmanArgs` fallback is mechanical. ~85% of version-gated fields live here.
-- **Custom mapper functions** — Complex fields (e.g. `build` which produces a whole unit, `entrypoint` which has a non-trivial P3 format) use `cfg.podmanVersion.AtLeast(...)` directly in their code.
+- **Inline in mapper functions** — Each field checks `cfg.PodmanVersion.AtLeast(...)` directly. Simple 1:1 fields use a version gate to emit the directive or a warning. Complex fields (e.g. `build` which produces a whole unit, `entrypoint` which has a non-trivial P3 format) emit different directive keys depending on the version.
 
 Systemd versions are tracked only as documentation in `doc/mapping.md`. In practice, modern podman implies modern systemd, so the library collapses to a single podman version axis.
 
@@ -358,10 +353,10 @@ comquad's existing `tests/integration/` harness. The library itself does not sta
 From the project scope document:
 
 1. **MVP** — `.container` files only, priority-1 field mappings, no opinionated transforms ✅
-2. **Full compose parity** — `.network`, `.volume`, `.image`, `.build` support, all priority-1 + priority-2
+2. **Full compose parity** — `.network`, `.volume`, `.image`, `.build` support, all priority-1 + priority-2 ✅
 3. **Opinionated defaults** — all comquad transforms ported as opt-out `TranspileOption`s
-4. **Deploy + systemd** — `deploy.resources`, `deploy.restart_policy` mapped to `[Service]`
-5. **Secrets + builds** — compose `secrets:` and `build:` handled natively
+4. **Deploy + systemd** — `deploy.resources`, `deploy.restart_policy` mapped to `[Service]` ✅
+5. **Secrets + builds** — compose `secrets:` and `build:` handled natively ✅
 6. **Integration** — comquad imports the library, drops podlet dependency
 7. **Deprecate podlet** — comquad no longer requires podlet binary at runtime
 
