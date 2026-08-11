@@ -328,8 +328,6 @@ func TestContainer_VersionGatedWarnings(t *testing.T) {
 	}
 }
 
-// T1 tests
-
 func TestContainer_Command(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", Command: types.ShellCommand{"npm", "start", "--port", "3000"}}
 	cfg := c2qtypes.DefaultConfig()
@@ -436,14 +434,21 @@ func TestContainer_Volumes(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", Volumes: []types.ServiceVolumeConfig{{Type: "bind", Source: "/host/data", Target: "/container/data"}}}
 	cfg := c2qtypes.DefaultConfig()
 	dirs := Container(svc, cfg)
-	assertDirective(t, dirs, "Volume", "/host/data:/container/data:rw")
+	assertDirective(t, dirs, "Mount", "type=bind,source=/host/data,destination=/container/data")
 }
 
 func TestContainer_Volumes_ReadOnly(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", Volumes: []types.ServiceVolumeConfig{{Type: "bind", Source: "/host/data", Target: "/app", ReadOnly: true}}}
 	cfg := c2qtypes.DefaultConfig()
 	dirs := Container(svc, cfg)
-	assertDirective(t, dirs, "Volume", "/host/data:/app:ro")
+	assertDirective(t, dirs, "Mount", "type=bind,source=/host/data,destination=/app,readonly")
+}
+
+func TestContainer_Volumes_VolumeType(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Volumes: []types.ServiceVolumeConfig{{Type: "volume", Source: "myvol", Target: "/data"}}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Volume", "myvol:/data:rw")
 }
 
 func TestContainer_Ports_ShortSyntax(t *testing.T) {
@@ -488,6 +493,26 @@ func TestContainer_NetworkMode_None(t *testing.T) {
 	assertDirective(t, dirs, "Network", "none")
 }
 
+func TestContainer_NetworkMode_Service(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", NetworkMode: "service:db"}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Network", "container:db.container")
+}
+
+func TestContainer_NetworkMode_Service_Unavailable(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", NetworkMode: "service:db"}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.PodmanVersion = c2qtypes.Version{Major: 5, Minor: 2}
+	dirs := Container(svc, cfg)
+	if hasDirective(dirs, "Network", "container:db.container") {
+		t.Fatal("should not emit Network=container: before 5.3")
+	}
+	if !hasWarning(cfg, "web", "network_mode") {
+		t.Fatal("expected WarningSkipped for network_mode: service")
+	}
+}
+
 func TestContainer_Networks(t *testing.T) {
 	svc := types.ServiceConfig{Name: "web", Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}, "backend": {}}}
 	cfg := c2qtypes.DefaultConfig()
@@ -504,142 +529,110 @@ func TestContainer_NetworkAliases(t *testing.T) {
 	assertDirective(t, dirs, "NetworkAlias", "www:frontend")
 }
 
-// Unit tests
-
-func TestUnit_DependsOn(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"db": {Condition: "service_started", Required: true}, "redis": {Condition: "service_started", Required: false}}}
-	dirs := Unit(svc)
-
-	assertDirective(t, dirs, "Requires", "db.container")
-	assertDirective(t, dirs, "Wants", "redis.container")
-	assertDirective(t, dirs, "After", "db.container")
-	assertDirective(t, dirs, "After", "redis.container")
+func TestContainer_Entrypoint_P1(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Entrypoint: types.ShellCommand{"npm", "start"}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Entrypoint", "npm start")
 }
 
-func TestUnit_DependsOn_Restart(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{"db": {Condition: "service_started", Required: true, Restart: true}}}
-	dirs := Unit(svc)
+func TestContainer_Entrypoint_P3Fallback(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Entrypoint: types.ShellCommand{"/custom-init", "--verbose"}}
+	cfg := c2qtypes.DefaultConfig()
+	cfg.PodmanVersion = c2qtypes.Version{Major: 4, Minor: 8}
+	dirs := Container(svc, cfg)
 
-	assertDirective(t, dirs, "Requires", "db.container")
-	assertDirective(t, dirs, "BindsTo", "db.container")
-	assertDirective(t, dirs, "After", "db.container")
-}
-
-func TestUnit_DependsOn_Empty(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", DependsOn: types.DependsOnConfig{}}
-	dirs := Unit(svc)
-	if len(dirs) != 0 {
-		t.Fatalf("expected no directives, got %v", dirs)
+	assertDirective(t, dirs, "PodmanArgs", "--entrypoint /custom-init --verbose")
+	if !hasWarning(cfg, "web", "entrypoint") {
+		t.Fatal("expected WarningDegraded for entrypoint at 4.8")
 	}
 }
 
-// Healthcheck tests
-
-func TestHealthcheck_CMD(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", HealthCheck: &types.HealthCheckConfig{Test: types.HealthCheckTest{"CMD", "curl", "localhost"}}}
+func TestContainer_Entrypoint_Noop(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web"}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := Healthcheck(svc, cfg)
-	assertDirective(t, dirs, "HealthCmd", "curl localhost")
-}
-
-func TestHealthcheck_CMDSHELL(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", HealthCheck: &types.HealthCheckConfig{Test: types.HealthCheckTest{"CMD-SHELL", "curl -f http://localhost || exit 1"}}}
-	cfg := c2qtypes.DefaultConfig()
-	dirs := Healthcheck(svc, cfg)
-	assertDirective(t, dirs, "HealthCmd", "/bin/sh -c curl -f http://localhost || exit 1")
-}
-
-func TestHealthcheck_NONE(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", HealthCheck: &types.HealthCheckConfig{Test: types.HealthCheckTest{"NONE"}}}
-	cfg := c2qtypes.DefaultConfig()
-	dirs := Healthcheck(svc, cfg)
-	if len(dirs) > 0 {
-		t.Fatalf("expected no directives for NONE test, got %v", dirs)
+	dirs := Container(svc, cfg)
+	if hasDirective(dirs, "Entrypoint", "") || hasDirective(dirs, "PodmanArgs", "") {
+		t.Fatal("should not emit entrypoint directives when field is empty")
 	}
 }
 
-func TestHealthcheck_Disable(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", HealthCheck: &types.HealthCheckConfig{Disable: true, Test: types.HealthCheckTest{"CMD", "curl", "localhost"}}}
+func TestContainer_Memory(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", MemLimit: 536870912}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := Healthcheck(svc, cfg)
-	if len(dirs) > 0 {
-		t.Fatalf("expected no directives when disabled, got %v", dirs)
-	}
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Memory", "536870912")
 }
 
-func TestHealthcheck_Interval(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", HealthCheck: &types.HealthCheckConfig{Test: types.HealthCheckTest{"CMD", "true"}, Interval: durationPtr(types.Duration(10_000_000_000)), Timeout: durationPtr(types.Duration(5_000_000_000)), Retries: uintPtr(3)}}
+func TestContainer_Memory_Unavailable(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", MemLimit: 536870912}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := Healthcheck(svc, cfg)
-	assertDirective(t, dirs, "HealthInterval", "10s")
-	assertDirective(t, dirs, "HealthTimeout", "5s")
-	assertDirective(t, dirs, "HealthRetries", "3")
+	cfg.PodmanVersion = c2qtypes.Version{Major: 5, Minor: 4}
+	dirs := Container(svc, cfg)
+	if hasDirective(dirs, "Memory", "536870912") {
+		t.Fatal("should not emit Memory= before 5.5")
+	}
 }
 
-func TestHealthcheck_StartPeriod(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", HealthCheck: &types.HealthCheckConfig{Test: types.HealthCheckTest{"CMD", "true"}, StartPeriod: durationPtr(types.Duration(30_000_000_000)), StartInterval: durationPtr(types.Duration(2_000_000_000))}}
+func TestContainer_Cgroup_Host(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Cgroup: "host"}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := Healthcheck(svc, cfg)
-	assertDirective(t, dirs, "HealthStartPeriod", "30s")
-	assertDirective(t, dirs, "HealthStartupInterval", "2s")
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "CgroupsMode", "host")
 }
 
-func TestHealthcheck_Nil(t *testing.T) {
-	svc := types.ServiceConfig{Name: "web", HealthCheck: nil}
+func TestContainer_Cgroup_Host_Unavailable(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Cgroup: "host"}
 	cfg := c2qtypes.DefaultConfig()
-	dirs := Healthcheck(svc, cfg)
-	if len(dirs) > 0 {
-		t.Fatalf("expected no directives for nil healthcheck, got %v", dirs)
+	cfg.PodmanVersion = c2qtypes.Version{Major: 5, Minor: 2}
+	dirs := Container(svc, cfg)
+	if hasDirective(dirs, "CgroupsMode", "host") {
+		t.Fatal("should not emit CgroupsMode before 5.3")
+	}
+	if !hasWarning(cfg, "web", "cgroup") {
+		t.Fatal("expected WarningSkipped for cgroup host at 5.2")
 	}
 }
 
-// Helpers
-
-func assertDirective(t *testing.T, dirs []c2qtypes.Directive, key, value string) {
-	t.Helper()
-	for _, d := range dirs {
-		if d.Key != key {
-			continue
-		}
-		if len(d.Values) == 0 && value == "" {
-			return
-		}
-		for _, v := range d.Values {
-			if v == value {
-				return
-			}
-		}
-	}
-	t.Fatalf("directive %s=%s not found in %v", key, value, dirs)
+func TestContainer_Cgroup_Private(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Cgroup: "private"}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "PodmanArgs", "--cgroupns private")
 }
 
-func hasDirective(dirs []c2qtypes.Directive, key, value string) bool {
-	for _, d := range dirs {
-		if d.Key != key {
-			continue
-		}
-		if len(d.Values) == 0 && value == "" {
-			return true
-		}
-		for _, v := range d.Values {
-			if v == value {
-				return true
-			}
-		}
-	}
-	return false
+func TestContainer_BindMount(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Volumes: []types.ServiceVolumeConfig{
+		{Type: "bind", Source: "/host/app", Target: "/app"},
+	}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Mount", "type=bind,source=/host/app,destination=/app")
 }
 
-func hasWarning(cfg *c2qtypes.Config, service, field string) bool {
-	for _, w := range cfg.Warnings {
-		if w.Service == service && w.Field == field {
-			return true
-		}
-	}
-	return false
+func TestContainer_BindMount_Propagation(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Volumes: []types.ServiceVolumeConfig{
+		{Type: "bind", Source: "/host/shared", Target: "/shared", Bind: &types.ServiceVolumeBind{Propagation: "rshared"}},
+	}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Mount", "type=bind,source=/host/shared,destination=/shared,bind-propagation=rshared")
 }
 
-func boolPtr(b bool) *bool             { return &b }
-func strPtr(s string) *string          { return &s }
-func uintPtr(u uint64) *uint64         { return &u }
-func durationPtr(d types.Duration) *types.Duration { return &d }
+func TestContainer_BindMount_SELinux(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Volumes: []types.ServiceVolumeConfig{
+		{Type: "bind", Source: "/host/data", Target: "/data", Bind: &types.ServiceVolumeBind{SELinux: "z"}},
+	}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Mount", "type=bind,source=/host/data,destination=/data,selinux=z")
+}
+
+func TestContainer_Tmpfs_LongSyntax(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Volumes: []types.ServiceVolumeConfig{
+		{Type: "tmpfs", Target: "/run", Tmpfs: &types.ServiceVolumeTmpfs{Size: 67108864, Mode: 1700}},
+	}}
+	cfg := c2qtypes.DefaultConfig()
+	dirs := Container(svc, cfg)
+	assertDirective(t, dirs, "Tmpfs", "/run:size=67108864,mode=3244")
+}

@@ -39,6 +39,20 @@ func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 			})
 		}
 	}
+	if len(svc.Entrypoint) > 0 {
+		if cfg.PodmanVersion.AtLeast(5, 0) {
+			dirs = append(dirs, c2qtypes.Directive{Key: "Entrypoint", Values: []string{strings.Join(svc.Entrypoint, " ")}})
+		} else {
+			dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--entrypoint " + strings.Join(svc.Entrypoint, " ")}})
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningDegraded,
+				Service: svc.Name,
+				Field:   "entrypoint",
+				Message: "using PodmanArgs fallback; upgrade to podman >= 5.0.0 for native Entrypoint= support",
+				Since:   "5.0.0",
+			})
+		}
+	}
 	if svc.Init != nil && *svc.Init {
 		dirs = append(dirs, c2qtypes.Directive{Key: "RunInit", Values: []string{"true"}})
 	}
@@ -78,6 +92,28 @@ func t0Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 	}
 
 	dirs = append(dirs, SecurityOpts(svc.SecurityOpt, svc.Name, cfg)...)
+
+	if svc.MemLimit > 0 {
+		if cfg.PodmanVersion.AtLeast(5, 5) {
+			dirs = append(dirs, c2qtypes.Directive{Key: "Memory", Values: []string{strconv.FormatInt(int64(svc.MemLimit), 10)}})
+		}
+	}
+	if svc.Cgroup == "host" {
+		if cfg.PodmanVersion.AtLeast(5, 3) {
+			dirs = append(dirs, c2qtypes.Directive{Key: "CgroupsMode", Values: []string{"host"}})
+		} else {
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningSkipped,
+				Service: svc.Name,
+				Field:   "cgroup",
+				Message: "requires podman >= 5.3.0",
+				Since:   "5.3.0",
+			})
+		}
+	}
+	if svc.Cgroup == "private" {
+		dirs = append(dirs, c2qtypes.Directive{Key: "PodmanArgs", Values: []string{"--cgroupns private"}})
+	}
 
 	if svc.UserNSMode != "" {
 		if cfg.PodmanVersion.AtLeast(4, 5) {
@@ -359,7 +395,13 @@ func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 	}
 
 	for _, v := range svc.Volumes {
-		dirs = append(dirs, c2qtypes.Directive{Key: "Volume", Values: []string{v.String()}})
+		if v.Type == types.VolumeTypeBind {
+			dirs = append(dirs, c2qtypes.Directive{Key: "Mount", Values: []string{formatBindMount(v)}})
+		} else if v.Type == types.VolumeTypeTmpfs {
+			dirs = append(dirs, c2qtypes.Directive{Key: "Tmpfs", Values: []string{formatTmpfsMount(v)}})
+		} else {
+			dirs = append(dirs, c2qtypes.Directive{Key: "Volume", Values: []string{v.String()}})
+		}
 	}
 
 	for _, p := range svc.Ports {
@@ -370,6 +412,19 @@ func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 		dirs = append(dirs, c2qtypes.Directive{Key: "Network", Values: []string{"host"}})
 	} else if svc.NetworkMode == "none" {
 		dirs = append(dirs, c2qtypes.Directive{Key: "Network", Values: []string{"none"}})
+	} else if strings.HasPrefix(svc.NetworkMode, "service:") {
+		target := strings.TrimPrefix(svc.NetworkMode, "service:")
+		if cfg.PodmanVersion.AtLeast(5, 3) {
+			dirs = append(dirs, c2qtypes.Directive{Key: "Network", Values: []string{"container:" + target + ".container"}})
+		} else {
+			cfg.Warn(c2qtypes.Warning{
+				Level:   c2qtypes.WarningSkipped,
+				Service: svc.Name,
+				Field:   "network_mode",
+				Message: "network_mode: service:<name> requires podman >= 5.3.0",
+				Since:   "5.3.0",
+			})
+		}
 	} else if svc.NetworkMode == "" || svc.NetworkMode == "bridge" {
 		for name, net := range svc.Networks {
 			dirs = append(dirs, c2qtypes.Directive{Key: "Network", Values: []string{name + ".network"}})
@@ -398,4 +453,40 @@ func t1Container(svc types.ServiceConfig, cfg *c2qtypes.Config) []c2qtypes.Direc
 	}
 
 	return dirs
+}
+
+func formatBindMount(v types.ServiceVolumeConfig) string {
+	var parts []string
+	parts = append(parts, "type=bind")
+	parts = append(parts, "source="+v.Source)
+	parts = append(parts, "destination="+v.Target)
+	if v.ReadOnly {
+		parts = append(parts, "readonly")
+	}
+	if v.Bind != nil {
+		if v.Bind.Propagation != "" {
+			parts = append(parts, "bind-propagation="+v.Bind.Propagation)
+		}
+		if v.Bind.SELinux != "" {
+			parts = append(parts, "selinux="+v.Bind.SELinux)
+		}
+	}
+	return strings.Join(parts, ",")
+}
+
+func formatTmpfsMount(v types.ServiceVolumeConfig) string {
+	val := v.Target
+	if v.Tmpfs != nil {
+		var opts []string
+		if v.Tmpfs.Size > 0 {
+			opts = append(opts, fmt.Sprintf("size=%d", v.Tmpfs.Size))
+		}
+		if v.Tmpfs.Mode > 0 {
+			opts = append(opts, fmt.Sprintf("mode=%o", v.Tmpfs.Mode))
+		}
+		if len(opts) > 0 {
+			val += ":" + strings.Join(opts, ",")
+		}
+	}
+	return val
 }

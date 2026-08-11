@@ -24,7 +24,7 @@ File: `mapper/container.go`
 | 6 | `annotations` (map/list) | `Annotation=` | 4.4.0 | ✅ |
 | 7 | `cap_add` | `AddCapability=` | 4.4.0 | ✅ |
 | 8 | `cap_drop` | `DropCapability=` | 4.4.0 | ✅ |
-| 9 | `group` | `Group=` | 4.4.0 | ❌ compose-go uses `group_add`, not `group` |
+| 9 | `group` | | | ❌ compose-go uses `group_add`, not `group` |
 | 10 | `user` | `User=` | 4.4.0 | ✅ |
 | 11 | `expose` | `ExposeHostPort=` | 4.4.0 | ✅ |
 
@@ -49,11 +49,11 @@ File: `mapper/container.go`
 
 | # | Compose field | → Directive | Since | Status |
 |---|---|---|---|---|
-| 24 | `uid_map` | `UIDMap=` | 4.8.0 | ❌ no field in compose-go v2 — use PodmanArgs= |
-| 25 | `gid_map` | `GIDMap=` | 4.8.0 | ❌ no field in compose-go v2 — use PodmanArgs= |
-| 26 | `sub_uid_map` | `SubUIDMap=` | 4.8.0 | ❌ no field in compose-go v2 — use PodmanArgs= |
-| 27 | `sub_gid_map` | `SubGIDMap=` | 4.8.0 | ❌ no field in compose-go v2 — use PodmanArgs= |
-| 28 | `read_only` (+ tmpfs flag) | `ReadOnlyTmpfs=` | 4.8.0 | ❌ ReadOnly is bool, no separate tmpfs distinction in compose-go |
+| 24 | `uid_map` | | | ❌ no field in compose-go v2 — use PodmanArgs= |
+| 25 | `gid_map` | | | ❌ no field in compose-go v2 — use PodmanArgs= |
+| 26 | `sub_uid_map` | | | ❌ no field in compose-go v2 — use PodmanArgs= |
+| 27 | `sub_gid_map` | | | ❌ no field in compose-go v2 — use PodmanArgs= |
+| 28 | `read_only` (+ tmpfs flag) | | | ❌ ReadOnly is bool, no separate tmpfs distinction in compose-go |
 | 29 | `devices` (`HOST:CONTAINER[:PERMS]`) | `AddDevice=` | 4.4.0 | ⏳ exists as `Devices []DeviceMapping` — needs struct parsing (T1/T2) |
 | 30 | `devices` (CDI syntax) | `AddDevice=` | 4.4.0 | ⏳ see #29 |
 | 31 | `working_dir` | `WorkingDir=` | 4.6.0 | ✅ |
@@ -66,15 +66,14 @@ File: `mapper/container.go`
 | 38 | `stop_grace_period` | `StopTimeout=` | 5.0.0 | ✅ |
 | 39 | `stop_signal` | `StopSignal=` | 5.2.0 | ✅ |
 | 40 | `pull_policy` | `Pull=` | 4.6.0 | ✅ |
-| 41 | `notify` | `Notify=` | 5.0.0 | ❌ no field in compose-go v2 — derive from healthcheck/deploy? |
-| 42 | `timezone` | `Timezone=` | 4.6.0 | ❌ no field in compose-go v2 — may set via environment TZ= |
-| 43 | `rootfs` | `Rootfs=` | 4.5.0 | ❌ no field in compose-go v2 |
-| 44 | `reload_signal` | `ReloadSignal=` | 5.5.0 | ❌ no field in compose-go v2 |
-| 45 | `image_volume` | `ImageVolume=` | 6.1.0 | ❌ no field in compose-go v2 |
-| 46 | `service_name` | `ServiceName=` | 5.3.0 | ✅ mapped from `svc.Name` |
-| 47 | `containers_conf_module` | `ContainersConfModule=` | ? | ❌ no field in compose-go v2 |
-| 48 | `http_proxy` | `HttpProxy=` | 5.7.0 | ❌ no field in compose-go v2 |
-| 49 | `environment_host` | `EnvironmentHost=` | ? | ❌ no field in compose-go v2 |
+| 41 | `notify` | | | ❌ no field in compose-go v2 — derive from healthcheck/deploy? |
+| 42 | `timezone` | | | ❌ no field in compose-go v2 — may set via environment TZ= |
+| 43 | `rootfs` | | | ❌ no field in compose-go v2 |
+| 44 | `reload_signal` | | | ❌ no field in compose-go v2 |
+| 45 | `image_volume` | | | ❌ no field in compose-go v2 |
+| 47 | `containers_conf_module` | | | ❌ no field in compose-go v2 |
+| 48 | `http_proxy` | | | ❌ no field in compose-go v2 |
+| 49 | `environment_host` | | | ❌ no field in compose-go v2 |
 
 File: `mapper/container.go` — network IP (moved from network.go)
 
@@ -106,7 +105,7 @@ File: `mapper/container.go`
 | 60 | `pids_limit` | `PidsLimit=` | passthrough | 4.7.0 | ✅ |
 | 61 | `ulimits` | `Ulimit=` | format: `name=soft:hard` | 4.7.0 | ✅ |
 | 62 | `extra_hosts` (list/map) | `AddHost=` | `host:ip` format | 5.3.0 | ✅ |
-| 63 | `reload_cmd` | `ReloadCmd=` | list→space-joined | 5.5.0 | ❌ no field in compose-go v2 |
+| 63 | `reload_cmd` | | | | ❌ no field in compose-go v2 |
 | 64 | `environment` (key-only) | `Environment=` | emit bare key | 5.6.0 | ✅ |
 
 File: `mapper/container.go` — volume mounts
@@ -158,10 +157,10 @@ File: `mapper/container.go` — healthcheck
 | 85 | `healthcheck.start_interval` | `HealthStartupInterval=` | passthrough | 4.5.0 | ✅ |
 | 94 | `healthcheck.test` (NONE) | *(omit health directives)* | skip all health directives | 4.5.0 | ✅ |
 | 95 | `healthcheck.disable: true` | *(omit health directives)* | skip all health directives | 4.5.0 | ✅ |
-| 86 | `healthcheck.on_failure` | `HealthOnFailure=` | passthrough | 4.5.0 | ❌ not in compose-go HealthCheckConfig |
-| 87 | `healthcheck.log_destination` | `HealthLogDestination=` | passthrough | 5.3.0 | ❌ not in compose-go HealthCheckConfig |
-| 88 | `healthcheck.max_log_count` | `HealthMaxLogCount=` | passthrough | 5.3.0 | ❌ not in compose-go HealthCheckConfig |
-| 89 | `healthcheck.max_log_size` | `HealthMaxLogSize=` | passthrough | 5.3.0 | ❌ not in compose-go HealthCheckConfig |
+| 86 | `healthcheck.on_failure` | | | | ❌ not in compose-go HealthCheckConfig |
+| 87 | `healthcheck.log_destination` | | | | ❌ not in compose-go HealthCheckConfig |
+| 88 | `healthcheck.max_log_count` | | | | ❌ not in compose-go HealthCheckConfig |
+| 89 | `healthcheck.max_log_size` | | | | ❌ not in compose-go HealthCheckConfig |
 
 ---
 
@@ -172,80 +171,80 @@ version-conditional P1 vs P3 fallback paths.
 
 File: `mapper/container.go`
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 90 | `entrypoint` (string/list) | `Entrypoint=` | list→space-joined; P3 PodmanArgs fallback pre-5.0 | 5.0.0 |
-| 91 | `volumes` (long, bind) | `Mount=type=bind,...` | construct mount string | 4.5.0 |
-| 92 | `volumes` (long, volume) | `Volume=` | long→short conversion | 4.4.0 |
-| 93 | `tmpfs` (long syntax, `size`/`mode`) | `Tmpfs=` | construct `path:opt1,opt2` | 4.5.0 |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 90 | `entrypoint` (string/list) | `Entrypoint=` | list→space-joined; P3 PodmanArgs fallback pre-5.0 | 5.0.0 | ✅ |
+| 91 | `volumes` (long, bind) | `Mount=type=bind,...` | construct mount string | 4.5.0 | ✅ |
+| 92 | `volumes` (long, volume) | `Volume=` | long→short conversion | 4.4.0 | ✅ |
+| 93 | `tmpfs` (long syntax, `size`/`mode`) | `Tmpfs=` | construct `path:opt1,opt2` | 4.5.0 | ✅ |
 | 94 | `healthcheck.test` (NONE) | *(omit health directives)* | skip all health directives | 4.5.0 | ⏳ moved to T1 ✅ |
 | 95 | `healthcheck.disable: true` | *(omit health directives)* | skip all health directives | 4.5.0 | ⏳ moved to T1 ✅ |
 
 File: `mapper/container.go` — resource version gate (P1 quadlet vs P2 systemd)
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 96 | `mem_limit` (P1) | `Memory=` | P1 since 5.5.0; P2 fallback `MemoryMax=[Service]` | 5.5.0 |
-| 97 | `mem_limit` (P2 alt) | `MemoryMax=` [Service] | pre-5.5.0 preferred path | sd 231 |
-| 98 | `pids_limit` (P2 alt) | `TasksMax=` [Service] | alt to direct PidsLimit= | sd 227 |
-| 99 | `oom_kill_disable` (P2) | `ManagedOOMMemoryPressure=kill` [Service] | default P2; P3 alt `--oom-kill-disable` | sd 247 |
-| 100 | `cgroup_parent` (P2) | `Slice=` [Service] | default P2; P3 alt `--cgroup-parent ...` | sd 208 |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 96 | `mem_limit` (P1) | `Memory=` | P1 since 5.5.0; P2 fallback `MemoryMax=[Service]` | 5.5.0 | ✅ |
+| 97 | `mem_limit` (P2 alt) | `MemoryMax=` [Service] | pre-5.5.0 preferred path | sd 231 | ✅ |
+| 98 | `pids_limit` (P2 alt) | `TasksMax=` [Service] | alt to direct PidsLimit= | sd 227 | ✅ |
+| 99 | `oom_kill_disable` (P2) | `ManagedOOMMemoryPressure=kill` [Service] | default P2; P3 alt `--oom-kill-disable` | sd 247 | ✅ |
+| 100 | `cgroup_parent` (P2) | `Slice=` [Service] | default P2; P3 alt `--cgroup-parent ...` | sd 208 | ✅ |
 
 File: `mapper/service.go` — systemd resource-control
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 101 | `mem_reservation` | `MemoryLow=` [Service] | | sd 240 |
-| 102 | `memswap_limit` | `MemorySwapMax=` [Service] | | sd 232 |
-| 103 | `cpus` | `CPUQuota=` [Service] | fractional→percent×period | sd 213 |
-| 104 | `cpu_shares` | `CPUWeight=` [Service] | shares→weight conversion | sd 232 |
-| 105 | `cpu_period` | `CPUQuotaPeriodSec=` [Service] | | sd 242 |
-| 106 | `cpu_quota` | `CPUQuota=` [Service] | | sd 213 |
-| 107 | `cpuset` | `AllowedCPUs=` [Service] | | sd 244 |
-| 108 | `oom_score_adj` | `OOMScoreAdjust=` [Service] | | sd 208 |
-| 109 | `blkio_config.weight` | `IOWeight=` [Service] | | sd 230 |
-| 110 | `blkio_config.weight_device` | `IODeviceWeight=` [Service] | | sd 230 |
-| 111 | `blkio_config.device_read_bps` | `IOReadBandwidthMax=` [Service] | | sd 230 |
-| 112 | `blkio_config.device_write_bps` | `IOWriteBandwidthMax=` [Service] | | sd 230 |
-| 113 | `blkio_config.device_read_iops` | `IOReadIOPSMax=` [Service] | | sd 230 |
-| 114 | `blkio_config.device_write_iops` | `IOWriteIOPSMax=` [Service] | | sd 230 |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 101 | `mem_reservation` | `MemoryLow=` [Service] | | sd 240 | ✅ |
+| 102 | `memswap_limit` | `MemorySwapMax=` [Service] | | sd 232 | ✅ |
+| 103 | `cpus` | `CPUQuota=` [Service] | fractional→percent×period | sd 213 | ✅ |
+| 104 | `cpu_shares` | `CPUWeight=` [Service] | shares→weight conversion | sd 232 | ✅ |
+| 105 | `cpu_period` | `CPUQuotaPeriodSec=` [Service] | | sd 242 | ✅ |
+| 106 | `cpu_quota` | `CPUQuota=` [Service] | | sd 213 | ✅ |
+| 107 | `cpuset` | `AllowedCPUs=` [Service] | | sd 244 | ✅ |
+| 108 | `oom_score_adj` | `OOMScoreAdjust=` [Service] | | sd 208 | ✅ |
+| 109 | `blkio_config.weight` | `IOWeight=` [Service] | | sd 230 | ✅ |
+| 110 | `blkio_config.weight_device` | `IODeviceWeight=` [Service] | | sd 230 | ✅ |
+| 111 | `blkio_config.device_read_bps` | `IOReadBandwidthMax=` [Service] | | sd 230 | ✅ |
+| 112 | `blkio_config.device_write_bps` | `IOWriteBandwidthMax=` [Service] | | sd 230 | ✅ |
+| 113 | `blkio_config.device_read_iops` | `IOReadIOPSMax=` [Service] | | sd 230 | ✅ |
+| 114 | `blkio_config.device_write_iops` | `IOWriteIOPSMax=` [Service] | | sd 230 | ✅ |
 
 File: `mapper/service.go` — restart logic
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 115 | `restart: no/always` | `Restart=` [Service] | direct mapping | sd 208 |
-| 116 | `restart: on-failure` | `Restart=on-failure` [Service] | | sd 208 |
-| 117 | `restart: on-failure:<N>` | `Restart=on-failure` + `StartLimitBurst=N` [Service] | split into two directives | sd 208 |
-| 118 | `restart: unless-stopped` | `Restart=always` [Service] | compose→systemd semantic mapping | sd 208 |
-| 119 | `deploy.restart_policy.condition` | `Restart=` [Service] | same as `restart` but deploy section | sd 208 |
-| 120 | `deploy.restart_policy.delay` | `RestartSec=` [Service] | | sd 208 |
-| 121 | `deploy.restart_policy.max_attempts` | `StartLimitBurst=` / `StartLimitIntervalSec=` [Service] | | sd 208 |
-| 122 | `deploy.restart_policy.window` | `RuntimeMaxSec=` [Service] | | sd 229 |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 115 | `restart: no/always` | `Restart=` [Service] | direct mapping | sd 208 | ✅ |
+| 116 | `restart: on-failure` | `Restart=on-failure` [Service] | | sd 208 | ✅ |
+| 117 | `restart: on-failure:<N>` | `Restart=on-failure` + `StartLimitBurst=N` [Service] | split into two directives | sd 208 | ✅ |
+| 118 | `restart: unless-stopped` | `Restart=always` [Service] | compose→systemd semantic mapping | sd 208 | ✅ |
+| 119 | `deploy.restart_policy.condition` | `Restart=` [Service] | same as `restart` but deploy section | sd 208 | ✅ |
+| 120 | `deploy.restart_policy.delay` | `RestartSec=` [Service] | | sd 208 | ✅ |
+| 121 | `deploy.restart_policy.max_attempts` | `StartLimitBurst=` / `StartLimitIntervalSec=` [Service] | | sd 208 | ✅ |
+| 122 | `deploy.restart_policy.window` | `RuntimeMaxSec=` [Service] | | sd 229 | ✅ |
 
 File: `mapper/service.go` — deploy.resources
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 123 | `deploy.resources.limits.cpus` | `CPUQuota=` [Service] | | sd 213 |
-| 124 | `deploy.resources.limits.memory` | `MemoryMax=` [Service] | | sd 231 |
-| 125 | `deploy.resources.limits.pids` | `TasksMax=` [Service] | | sd 227 |
-| 126 | `deploy.resources.reservations.cpus` | `CPUWeight=` [Service] | | sd 232 |
-| 127 | `deploy.resources.reservations.memory` | `MemoryLow=` [Service] | | sd 240 |
-| 128 | `ulimits` (P2 alt) | `Limit*= ` [Service] | emit `LimitXXX=value` per ulimit name | sd 208 |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 123 | `deploy.resources.limits.cpus` | `CPUQuota=` [Service] | | sd 213 | ✅ |
+| 124 | `deploy.resources.limits.memory` | `MemoryMax=` [Service] | | sd 231 | ✅ |
+| 125 | `deploy.resources.limits.pids` | `TasksMax=` [Service] | | sd 227 | ✅ |
+| 126 | `deploy.resources.reservations.cpus` | `CPUWeight=` [Service] | | sd 232 | ✅ |
+| 127 | `deploy.resources.reservations.memory` | `MemoryLow=` [Service] | | sd 240 | ✅ |
+| 128 | `ulimits` (P2 alt) | `Limit*= ` [Service] | emit `LimitXXX=value` per ulimit name | sd 208 | ✅ |
 
 File: `mapper/network.go` — network_mode service
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 129 | `network_mode: service:<name>` | `Network=container:<name>.container` | cross-ref | 5.3.0 |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 129 | `network_mode: service:<name>` | `Network=container:<name>.container` | cross-ref | 5.3.0 | ✅ |
 
 File: `mapper/container.go` — cgroup modes
 
-| # | Compose field | → Directive | Notes | Since |
-|---|---|---|---|---|
-| 130 | `cgroup: host` | `CgroupsMode=host` | | 5.3.0 |
-| 131 | `cgroup: private` | `PodmanArgs=--cgroupns private` (P3) | | 4.6.0 |
+| # | Compose field | → Directive | Notes | Since | Status |
+|---|---|---|---|---|---|
+| 130 | `cgroup: host` | `CgroupsMode=host` | | 5.3.0 | ✅ |
+| 131 | `cgroup: private` | `PodmanArgs=--cgroupns private` (P3) | | 4.6.0 | ✅ |
 
 ---
 
@@ -434,9 +433,9 @@ No mapping possible. Produce `WarningSkipped` for informational purposes.
 |---|---|---|---|
 | T0 | 51 | 35 | Trivial 1:1 passthrough (11 ❌ no compose-go field, 2 ⏳ moved up) |
 | T1 | 38 | 30 | Easy formatting / type conversion (5 ❌ no compose-go field) |
-| T2 | 39 | 0 | Medium complexity, version gating |
+| T2 | 39 | 39 | Medium complexity, version gating |
 | T3 | 20 | 0 | Hard (P3 PodmanArgs, complex parsing) |
 | T4 | 7 | 0 | Very hard (secrets/configs interceptor) |
 | T5 | 42 | 0 | Structural (separate quadlet units) |
 | P4 | 33 | 0 | Unsupported (warn only) |
-| **Total** | **230** | **65** | |
+| **Total** | **230** | **104** | |

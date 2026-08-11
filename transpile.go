@@ -31,6 +31,11 @@ func Transpile(project *types.Project, opts ...TranspileOption) ([]QuadletUnit, 
 			sections = append(sections, Section{Name: SectionContainer, Directives: containerDirs})
 		}
 
+		serviceDirs := mapper.Service(svc, cfg)
+		if len(serviceDirs) > 0 {
+			sections = append(sections, Section{Name: SectionService, Directives: serviceDirs})
+		}
+
 		if len(sections) == 0 {
 			continue
 		}

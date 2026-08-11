@@ -74,7 +74,7 @@ The **Since** column tracks the minimum version required for each mapping:
 | `entrypoint` (string/list) | 1 | `Entrypoint=` | `[Container]` | 5.0.0 |
 | `working_dir` | 1 | `WorkingDir=` | `[Container]` | 4.6.0 |
 | `user` | 1 | `User=` | `[Container]` | 4.4.0 |
-| `group` (uid:gid extra gid) | 1 | `Group=` | `[Container]` | 4.4.0 |
+| `group` (uid:gid extra gid) | | | | |
 | `init` | 1 | `RunInit=` | `[Container]` | 4.4.0 |
 | `stop_signal` | 1 | `StopSignal=` | `[Container]` | 5.2.0 |
 | `stop_grace_period` | 1 | `StopTimeout=` | `[Container]` | 5.0.0 |
@@ -82,13 +82,13 @@ The **Since** column tracks the minimum version required for each mapping:
 | `stdin_open` | 3 | `PodmanArgs=--attach stdin` | `[Container]` | 4.6.0 |
 | `pull_policy` | 1 | `Pull=` | `[Container]` | 4.6.0 |
 | `read_only` | 1 | `ReadOnly=` | `[Container]` | 4.4.0 |
-| `read_only` (tmpfs) | 1 | `ReadOnlyTmpfs=` | `[Container]` | 4.8.0 |
+| `read_only` (tmpfs) | | | | |
 | `runtime` | 3 | `GlobalArgs=--runtime <name>` | `[Container]` | 4.6.0 |
 | `platform` | — | `OS=` / `Arch=` / `Variant=` | `[Image]` | 4.8.0 |
 | `domainname` | 4 | — | — | — |
 | `attach` | 4 | — | — | — |
 | `develop` | 4 | — | — | — |
-| `rootfs` | 1 | `Rootfs=` | `[Container]` | 4.5.0 |
+| `rootfs` | | | | |
 
 ---
 
@@ -139,7 +139,7 @@ The **Since** column tracks the minimum version required for each mapping:
 | `tmpfs` (string/long) | 1 | `Tmpfs=` | `[Container]` | 4.5.0 |
 | `shm_size` | 1 | `ShmSize=` | `[Container]` | 4.7.0 |
 | `storage_opt` | 3 | `GlobalArgs=--storage-opt ...` | `[Container]` | 4.6.0 |
-| `image_volume` | 1 | `ImageVolume=` | `[Container]` | 6.1.0 |
+| `image_volume` | | | | |
 
 ---
 
@@ -153,7 +153,7 @@ The **Since** column tracks the minimum version required for each mapping:
 | `env_file` (string) | 1 | `EnvironmentFile=` | `[Container]` | 4.4.0 |
 | `env_file` (list) | 1 | `EnvironmentFile=` | `[Container]` | 4.4.0 |
 | `env_file` (`required: false`) | 1 | `EnvironmentFile=` | `[Container]` | 4.4.0 |
-| `environment_host` | 1 | `EnvironmentHost=` | `[Container]` | ? |
+| `environment_host` | | | | |
 
 ---
 
@@ -176,10 +176,10 @@ The **Since** column tracks the minimum version required for each mapping:
 | `security_opt: unmask=<path>` | 1 | `Unmask=` | `[Container]` | 4.6.0 |
 | `userns_mode` | 1 | `UserNS=` | `[Container]` | 4.5.0 |
 | `group_add` | 1 | `GroupAdd=` | `[Container]` | 5.1.0 |
-| `uid_map` | 1 | `UIDMap=` | `[Container]` | 4.8.0 |
-| `gid_map` | 1 | `GIDMap=` | `[Container]` | 4.8.0 |
-| `sub_uid_map` | 1 | `SubUIDMap=` | `[Container]` | 4.8.0 |
-| `sub_gid_map` | 1 | `SubGIDMap=` | `[Container]` | 4.8.0 |
+| `uid_map` | | | | |
+| `gid_map` | | | | |
+| `sub_uid_map` | | | | |
+| `sub_gid_map` | | | | |
 | `secrets` (short syntax) | — | *(handled pre-mapping)* | — | — |
 | `secrets` (long, external) | 1 | `Secret=` | `[Container]` | 4.5.0 |
 | `secrets` (long, file) | 1 | `Volume=<path>:/run/secrets/<name>:ro` | `[Container]` | 4.4.0 |
@@ -276,13 +276,13 @@ The **Since** column tracks the minimum version required for each mapping:
 | `healthcheck.retries` | 1 | `HealthRetries=` | `[Container]` | 4.5.0 |
 | `healthcheck.start_period` | 1 | `HealthStartPeriod=` | `[Container]` | 4.5.0 |
 | `healthcheck.start_interval` | 1 | `HealthStartupInterval=` | `[Container]` | 4.5.0 |
-| `healthcheck.on_failure` | 1 | `HealthOnFailure=` | `[Container]` | 4.5.0 |
-| `healthcheck.log_destination` | 1 | `HealthLogDestination=` | `[Container]` | 5.3.0 |
-| `healthcheck.max_log_count` | 1 | `HealthMaxLogCount=` | `[Container]` | 5.3.0 |
-| `healthcheck.max_log_size` | 1 | `HealthMaxLogSize=` | `[Container]` | 5.3.0 |
-| `notify` (sd_notify) | 1 | `Notify=` | `[Container]` | 5.0.0 |
-| `reload_cmd` | 1 | `ReloadCmd=` | `[Container]` | 5.5.0 |
-| `reload_signal` | 1 | `ReloadSignal=` | `[Container]` | 5.5.0 |
+| `healthcheck.on_failure` | | | | |
+| `healthcheck.log_destination` | | | | |
+| `healthcheck.max_log_count` | | | | |
+| `healthcheck.max_log_size` | | | | |
+| `notify` (sd_notify) | | | | |
+| `reload_cmd` | | | | |
+| `reload_signal` | | | | |
 
 ---
 
@@ -414,13 +414,13 @@ Generated as companion unit for every service with `image:`.
 | `label_file` | 1 | `Label=` | `[Container]` | — |
 | `annotations` (map/list) | 1 | `Annotation=` | `[Container]` | 4.4.0 |
 | `container_name` | 1 | `ContainerName=` | `[Container]` | 4.4.0 |
-| `service_name` | 1 | `ServiceName=` | `[Container]` | 5.3.0 |
+| `service_name` (derived from svc.Name) | 1 | `ServiceName=` | `[Container]` | 5.3.0 |
 | `sysctls` (map/list) | 1 | `Sysctl=` | `[Container]` | 4.6.0 |
 | `ulimits` | 2 | `Limit*= ` | `[Service]` | sd 208 |
 | `ulimits` (alt) | 1 | `Ulimit=` | `[Container]` | 4.7.0 |
-| `timezone` | 1 | `Timezone=` | `[Container]` | ? |
-| `http_proxy` | 1 | `HttpProxy=` | `[Container]` | 5.7.0 |
-| `containers_conf_module` | 1 | `ContainersConfModule=` | `[Container]` | ? |
+| `timezone` | | | | |
+| `http_proxy` | | | | |
+| `containers_conf_module` | | | | |
 
 ---
 
@@ -441,13 +441,13 @@ Generated as companion unit for every service with `image:`.
 
 | Priority | Count | Min podman/systemd |
 |---|---|---|
-| **1** Direct Quadlet | ~95 fields | 4.4.0 baseline, ~15 later additions |
+| **1** Direct Quadlet | ~76 fields | 4.4.0 baseline, ~15 later additions |
 | **2** Systemd `[Service]`/`[Unit]` | ~30 fields | sd 208 baseline, ~5 later additions |
 | **3** PodmanArgs passthrough | ~15 fields | 4.6.0 (PodmanArgs added) |
 | **4** Unsupported | ~25 fields | — |
 | **—** Structural | ~10 fields | 4.4.0 baseline |
 
-**Total: ~175 compose fields mapped.**
+**Total: ~156 compose fields mapped.**
 
 ## Version Requirement Summary
 
@@ -456,12 +456,11 @@ All core [Container], [Network], [Volume] quadlet types and `.image` type.
 ~85% of priority-1 fields available.
 
 ### Later podman versions unlock
-- 5.0.0: `Notify=`, `Entrypoint=` (as quadlet key), `StopTimeout=`
+- 5.0.0: `Entrypoint=` (as quadlet key), `StopTimeout=`
 - 5.2.0: `.build` type, `NetworkAlias=`, `StopSignal=`, `LogOpt=`
-- 5.3.0: `CgroupsMode=`, `AddHost=`, `ServiceName=`, health check log directives
-- 5.5.0: `Memory=`, `Retry=`/`RetryDelay=`, `ReloadCmd=`/`ReloadSignal=`
+- 5.3.0: `CgroupsMode=`, `AddHost=`, `ServiceName=`
+- 5.5.0: `Memory=`, `Retry=`/`RetryDelay=`
 - 5.6.0: `Policy=`, `InterfaceName=`, env key-only
-- 5.7.0: `HttpProxy=`, `BuildArg=` (build)
+- 5.7.0: `BuildArg=` (build)
 - 5.8.0: `AppArmor=`
 - 6.0.0: Volume `UID=`/`GID=`/`Options=`
-- 6.1.0: `ImageVolume=`
