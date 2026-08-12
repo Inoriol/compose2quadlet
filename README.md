@@ -1,8 +1,12 @@
 # compose2quadlet
 
+> **ARCHIVED** — This library has been merged into the main [comquad](https://github.com/Inoriol/comquad) repository.
+> The code now lives at [`comquad/compose2quadlet/`](https://github.com/Inoriol/comquad/blob/main/compose2quadlet/README.md).
+> This repository is read-only and no longer maintained.
+
 Go library that transpiles Docker Compose files into Podman Quadlet unit files.
 
-**Not a CLI tool.** This is a library designed to be consumed by [comquad](https://github.com/inoriol/comquad) and other tools that need programmatic compose-to-quadlet conversion.
+**Not a CLI tool.** This is a library designed to be consumed by [comquad](https://github.com/Inoriol/comquad) and other tools that need programmatic compose-to-quadlet conversion.
 
 Heavily inspired by [podlet](https://github.com/containers/podlet), but designed for the Go ecosystem.
 

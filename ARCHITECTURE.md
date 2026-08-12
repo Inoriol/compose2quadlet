@@ -1,5 +1,7 @@
 # Architecture Guide
 
+> **ARCHIVED** — This library has been merged into the main [comquad](https://github.com/Inoriol/comquad) repository at [`comquad/compose2quadlet/`](https://github.com/Inoriol/comquad/blob/main/compose2quadlet/README.md).
+
 This document describes the internal design, conventions, and data flow of compose2quadlet. It is written for AI agents and new contributors reading the codebase for the first time. Keep it updated as the project evolves.
 
 ## Official Specification Links
